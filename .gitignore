@@ -263,3 +263,5 @@ docs/dev
 
 # Clangd cache index
 .cache
+cmake-build-debug/*
+cmake-build-debug-docker/*
