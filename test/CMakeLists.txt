@@ -1,40 +1,23 @@
-file(GLOB BUSTUB_TEST_SOURCES "${PROJECT_SOURCE_DIR}/test/*/*test.cpp")
+cmake_minimum_required(VERSION 3.10)
 
-######################################################################################################################
-# DEPENDENCIES
-######################################################################################################################
+include(GoogleTest)
 
-# valgrind
-find_program(VALGRIND_BIN valgrind)
-if ("${VALGRIND_BIN}" STREQUAL "VALGRIND_BIN-NOTFOUND")
-    message(WARNING "BusTub/test couldn't find valgrind.")
-else()
-    message(STATUS "BusTub/test found valgrind at ${VALGRIND_BIN}")
-endif()
+file(GLOB_RECURSE BUSTUB_TEST_SOURCES "${PROJECT_SOURCE_DIR}/test/*/*test.cpp")
 
-set(VALGRIND_OPTIONS
-        --error-exitcode=1                      # if leaks are detected, return nonzero value
-        # --gen-suppressions=all  # uncomment for leak suppression syntax
-        --leak-check=full                       # detailed leak information
-        --soname-synonyms=somalloc=*jemalloc*   # also intercept jemalloc
-        --trace-children=yes                    # trace child processes
-        --track-origins=yes                     # track origin of uninitialized values
-        )
-set(VALGRIND_SUPPRESSIONS_FILE "${PROJECT_SOURCE_DIR}/build_support/valgrind.supp")
-
-######################################################################################################################
+# #####################################################################################################################
 # MAKE TARGETS
-######################################################################################################################
+# #####################################################################################################################
 
-##########################################
+# #########################################
 # "make check-tests"
-##########################################
+# #########################################
 add_custom_target(build-tests COMMAND ${CMAKE_CTEST_COMMAND} --show-only)
 add_custom_target(check-tests COMMAND ${CMAKE_CTEST_COMMAND} --verbose)
+add_custom_target(check-public-ci-tests COMMAND ${CMAKE_CTEST_COMMAND} --verbose -E SQLLogicTest)
 
-##########################################
+# #########################################
 # "make XYZ_test"
-##########################################
+# #########################################
 foreach (bustub_test_source ${BUSTUB_TEST_SOURCES})
     # Create a human readable name.
     get_filename_component(bustub_test_filename ${bustub_test_source} NAME)
@@ -45,19 +28,65 @@ foreach (bustub_test_source ${BUSTUB_TEST_SOURCES})
     add_dependencies(build-tests ${bustub_test_name})
     add_dependencies(check-tests ${bustub_test_name})
 
-    target_link_libraries(${bustub_test_name} bustub_shared gtest gmock_main)
+    gtest_discover_tests(${bustub_test_name}
+            EXTRA_ARGS
+            --gtest_color=auto
+            --gtest_output=xml:${CMAKE_BINARY_DIR}/test/${bustub_test_name}.xml
+            --gtest_catch_exceptions=0
+            DISCOVERY_TIMEOUT 120
+            PROPERTIES
+            TIMEOUT 120
+            )
+
+    target_link_libraries(${bustub_test_name} bustub gtest gmock_main)
 
     # Set test target properties and dependencies.
     set_target_properties(${bustub_test_name}
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test"
-        COMMAND ${bustub_test_name}
-    )
+            PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test"
+            COMMAND ${bustub_test_name}
+            )
+endforeach ()
 
-    # Add the test under CTest.
-    add_test(${bustub_test_name} ${VALGRIND_BIN} ${VALGRIND_OPTIONS}
-    --suppressions=${VALGRIND_SUPPRESSIONS_FILE} ${CMAKE_BINARY_DIR}/test/${bustub_test_name}
-    --gtest_color=yes --gtest_output=xml:${CMAKE_BINARY_DIR}/test/unit_${test_name}.xml)
-    add_test(${bustub_test_name} ${CMAKE_BINARY_DIR}/test/${bustub_test_name} --gtest_color=yes
-            --gtest_output=xml:${CMAKE_BINARY_DIR}/test/${bustub_test_name}.xml)
-endforeach(bustub_test_source ${BUSTUB_TEST_SOURCES})
+set(BUSTUB_SLT_SOURCES
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.01-seqscan.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.02-insert.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.03-delete.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.04-index-scan.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.05-empty-table.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.06-simple-agg.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.07-group-agg-1.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.08-group-agg-2.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.09-simple-join.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.10-multi-way-join.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.11-repeat-execute.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.12-nested-index-join.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.13-sort-limit.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.14-topn.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.15-integration-1.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.16-integration-2.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.leaderboard-q1.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.leaderboard-q2.slt"
+        "${PROJECT_SOURCE_DIR}/test/sql/p3.leaderboard-q3.slt"
+        )
+
+add_custom_target(test-p3 ${CMAKE_CTEST_COMMAND} -R SQLLogicTest)
+
+# #########################################
+# "make XYZ_test"
+# #########################################
+foreach (bustub_test_source ${BUSTUB_SLT_SOURCES})
+    # Create a human readable name.
+    get_filename_component(bustub_test_filename ${bustub_test_source} NAME)
+    string(REPLACE ".slt" "" bustub_filename_wo_suffix "${bustub_test_filename}")
+    string(REPLACE ".slt" "" bustub_test_name "SQLLogicTest.${bustub_filename_wo_suffix}")
+    add_test(NAME ${bustub_test_name} COMMAND "${CMAKE_BINARY_DIR}/bin/bustub-sqllogictest" ${bustub_test_source} --verbose -d --in-memory)
+    add_custom_target(${bustub_filename_wo_suffix}_test COMMAND "${CMAKE_BINARY_DIR}/bin/bustub-sqllogictest" "${bustub_test_source}" --verbose -d --in-memory)
+    add_dependencies(${bustub_filename_wo_suffix}_test sqllogictest)
+endforeach ()
+
+add_dependencies(test-p3 sqllogictest)
+
+# Must build sqllogictest before checking tests
+add_dependencies(build-tests sqllogictest)
+add_dependencies(check-tests sqllogictest)

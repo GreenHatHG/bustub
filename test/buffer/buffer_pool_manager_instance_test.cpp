@@ -11,9 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "buffer/buffer_pool_manager_instance.h"
+
 #include <cstdio>
 #include <random>
 #include <string>
+
 #include "buffer/buffer_pool_manager.h"
 #include "gtest/gtest.h"
 
@@ -24,13 +26,14 @@ namespace bustub {
 TEST(BufferPoolManagerInstanceTest, DISABLED_BinaryDataTest) {
   const std::string db_name = "test.db";
   const size_t buffer_pool_size = 10;
+  const size_t k = 5;
 
   std::random_device r;
   std::default_random_engine rng(r());
   std::uniform_int_distribution<char> uniform_dist(0);
 
   auto *disk_manager = new DiskManager(db_name);
-  auto *bpm = new BufferPoolManagerInstance(buffer_pool_size, disk_manager);
+  auto *bpm = new BufferPoolManagerInstance(buffer_pool_size, disk_manager, k);
 
   page_id_t page_id_temp;
   auto *page0 = bpm->NewPage(&page_id_temp);
@@ -39,19 +42,19 @@ TEST(BufferPoolManagerInstanceTest, DISABLED_BinaryDataTest) {
   ASSERT_NE(nullptr, page0);
   EXPECT_EQ(0, page_id_temp);
 
-  char random_binary_data[PAGE_SIZE];
+  char random_binary_data[BUSTUB_PAGE_SIZE];
   // Generate random binary data
   for (char &i : random_binary_data) {
     i = uniform_dist(rng);
   }
 
   // Insert terminal characters both in the middle and at end
-  random_binary_data[PAGE_SIZE / 2] = '\0';
-  random_binary_data[PAGE_SIZE - 1] = '\0';
+  random_binary_data[BUSTUB_PAGE_SIZE / 2] = '\0';
+  random_binary_data[BUSTUB_PAGE_SIZE - 1] = '\0';
 
   // Scenario: Once we have a page, we should be able to read and write content.
-  std::memcpy(page0->GetData(), random_binary_data, PAGE_SIZE);
-  EXPECT_EQ(0, std::memcmp(page0->GetData(), random_binary_data, PAGE_SIZE));
+  std::memcpy(page0->GetData(), random_binary_data, BUSTUB_PAGE_SIZE);
+  EXPECT_EQ(0, std::memcmp(page0->GetData(), random_binary_data, BUSTUB_PAGE_SIZE));
 
   // Scenario: We should be able to create new pages until we fill up the buffer pool.
   for (size_t i = 1; i < buffer_pool_size; ++i) {
@@ -74,7 +77,7 @@ TEST(BufferPoolManagerInstanceTest, DISABLED_BinaryDataTest) {
   }
   // Scenario: We should be able to fetch the data we wrote a while ago.
   page0 = bpm->FetchPage(0);
-  EXPECT_EQ(0, memcmp(page0->GetData(), random_binary_data, PAGE_SIZE));
+  EXPECT_EQ(0, memcmp(page0->GetData(), random_binary_data, BUSTUB_PAGE_SIZE));
   EXPECT_EQ(true, bpm->UnpinPage(0, true));
 
   // Shutdown the disk manager and remove the temporary file we created.
@@ -89,9 +92,10 @@ TEST(BufferPoolManagerInstanceTest, DISABLED_BinaryDataTest) {
 TEST(BufferPoolManagerInstanceTest, DISABLED_SampleTest) {
   const std::string db_name = "test.db";
   const size_t buffer_pool_size = 10;
+  const size_t k = 5;
 
   auto *disk_manager = new DiskManager(db_name);
-  auto *bpm = new BufferPoolManagerInstance(buffer_pool_size, disk_manager);
+  auto *bpm = new BufferPoolManagerInstance(buffer_pool_size, disk_manager, k);
 
   page_id_t page_id_temp;
   auto *page0 = bpm->NewPage(&page_id_temp);
@@ -101,7 +105,7 @@ TEST(BufferPoolManagerInstanceTest, DISABLED_SampleTest) {
   EXPECT_EQ(0, page_id_temp);
 
   // Scenario: Once we have a page, we should be able to read and write content.
-  snprintf(page0->GetData(), PAGE_SIZE, "Hello");
+  snprintf(page0->GetData(), BUSTUB_PAGE_SIZE, "Hello");
   EXPECT_EQ(0, strcmp(page0->GetData(), "Hello"));
 
   // Scenario: We should be able to create new pages until we fill up the buffer pool.

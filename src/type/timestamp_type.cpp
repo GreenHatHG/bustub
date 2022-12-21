@@ -114,9 +114,11 @@ auto TimestampType::ToString(const Value &val) const -> std::string {
   auto day = static_cast<uint16_t>(tm % 32);
   tm /= 32;
   auto month = static_cast<uint16_t>(tm);
-  char str[30];
-  char zone[5];
-  sprintf(str, "%04d-%02d-%02d %02d:%02d:%02d.%06d", year, month, day, hour, min, sec, micro);  // NOLINT
+  const size_t date_str_len = 30;
+  const size_t zone_len = 5;
+  char str[date_str_len];
+  char zone[zone_len];
+  snprintf(str, date_str_len, "%04d-%02d-%02d %02d:%02d:%02d.%06d", year, month, day, hour, min, sec, micro);
   if (tz >= 0) {
     str[26] = '+';
   } else {
@@ -125,7 +127,7 @@ auto TimestampType::ToString(const Value &val) const -> std::string {
   if (tz < 0) {
     tz = -tz;
   }
-  sprintf(zone, "%02d", tz);  // NOLINT
+  snprintf(zone, zone_len, "%02d", tz);  // NOLINT
   str[27] = 0;
   return std::string(std::string(str) + std::string(zone));
 }
@@ -137,11 +139,11 @@ void TimestampType::SerializeTo(const Value &val, char *storage) const {
 // Deserialize a value of the given type from the given storage space.
 auto TimestampType::DeserializeFrom(const char *storage) const -> Value {
   uint64_t val = *reinterpret_cast<const uint64_t *>(storage);
-  return Value(type_id_, val);
+  return {type_id_, val};
 }
 
 // Create a copy of this value
-auto TimestampType::Copy(const Value &val) const -> Value { return Value(val); }
+auto TimestampType::Copy(const Value &val) const -> Value { return {val}; }
 
 auto TimestampType::CastAs(const Value &val, const TypeId type_id) const -> Value {
   switch (type_id) {

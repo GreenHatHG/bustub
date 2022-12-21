@@ -21,6 +21,7 @@
 #include "buffer/buffer_pool_manager.h"
 #include "catalog/schema.h"
 #include "container/hash/hash_function.h"
+#include "storage/index/b_plus_tree_index.h"
 #include "storage/index/extendible_hash_table_index.h"
 #include "storage/index/index.h"
 #include "storage/table/table_heap.h"
@@ -117,17 +118,26 @@ class Catalog {
   /**
    * Create a new table and return its metadata.
    * @param txn The transaction in which the table is being created
-   * @param table_name The name of the new table
+   * @param table_name The name of the new table, note that all tables beginning with `__` are reserved for the system.
    * @param schema The schema of the new table
+   * @param create_table_heap whether to create a table heap for the new table
    * @return A (non-owning) pointer to the metadata for the table
    */
-  auto CreateTable(Transaction *txn, const std::string &table_name, const Schema &schema) -> TableInfo * {
+  auto CreateTable(Transaction *txn, const std::string &table_name, const Schema &schema, bool create_table_heap = true)
+      -> TableInfo * {
     if (table_names_.count(table_name) != 0) {
       return NULL_TABLE_INFO;
     }
 
     // Construct the table heap
-    auto table = std::make_unique<TableHeap>(bpm_, lock_manager_, log_manager_, txn);
+    std::unique_ptr<TableHeap> table = nullptr;
+
+    // TODO(Wan,chi): This should be refactored into a private ctor for the binder tests, we shouldn't allow nullptr.
+    // When create_table_heap == false, it means that we're running binder tests (where no txn will be provided) or
+    // we are running shell without buffer pool. We don't need to create TableHeap in this case.
+    if (create_table_heap) {
+      table = std::make_unique<TableHeap>(bpm_, lock_manager_, log_manager_, txn);
+    }
 
     // Fetch the table OID for the new table
     const auto table_oid = next_table_oid_.fetch_add(1);
@@ -149,7 +159,7 @@ class Catalog {
    * @param table_name The name of the table
    * @return A (non-owning) pointer to the metadata for the table
    */
-  auto GetTable(const std::string &table_name) -> TableInfo * {
+  auto GetTable(const std::string &table_name) const -> TableInfo * {
     auto table_oid = table_names_.find(table_name);
     if (table_oid == table_names_.end()) {
       // Table not found
@@ -167,7 +177,7 @@ class Catalog {
    * @param table_oid The OID of the table to query
    * @return A (non-owning) pointer to the metadata for the table
    */
-  auto GetTable(table_oid_t table_oid) -> TableInfo * {
+  auto GetTable(table_oid_t table_oid) const -> TableInfo * {
     auto meta = tables_.find(table_oid);
     if (meta == tables_.end()) {
       return NULL_TABLE_INFO;
@@ -214,8 +224,9 @@ class Catalog {
     // TODO(Kyle): We should update the API for CreateIndex
     // to allow specification of the index type itself, not
     // just the key, value, and comparator types
-    auto index = std::make_unique<ExtendibleHashTableIndex<KeyType, ValueType, KeyComparator>>(std::move(meta), bpm_,
-                                                                                               hash_function);
+
+    // TODO(chi): support both hash index and btree index
+    auto index = std::make_unique<BPlusTreeIndex<KeyType, ValueType, KeyComparator>>(std::move(meta), bpm_);
 
     // Populate the index with all tuples in table heap
     auto *table_meta = GetTable(table_name);
@@ -302,7 +313,7 @@ class Catalog {
    * @return A vector of IndexInfo* for each index on the given table, empty vector
    * in the event that the table exists but no indexes have been created for it
    */
-  auto GetTableIndexes(const std::string &table_name) -> std::vector<IndexInfo *> {
+  auto GetTableIndexes(const std::string &table_name) const -> std::vector<IndexInfo *> {
     // Ensure the table exists
     if (table_names_.find(table_name) == table_names_.end()) {
       return std::vector<IndexInfo *>{};
@@ -320,6 +331,14 @@ class Catalog {
     }
 
     return indexes;
+  }
+
+  auto GetTableNames() -> std::vector<std::string> {
+    std::vector<std::string> result;
+    for (const auto &x : table_names_) {
+      result.push_back(x.first);
+    }
+    return result;
   }
 
  private:

@@ -13,13 +13,18 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "catalog/column.h"
+#include "common/exception.h"
 #include "type/type.h"
 
 namespace bustub {
+
+class Schema;
+using SchemaRef = std::shared_ptr<const Schema>;
 
 class Schema {
  public:
@@ -29,13 +34,13 @@ class Schema {
    */
   explicit Schema(const std::vector<Column> &columns);
 
-  static auto CopySchema(const Schema *from, const std::vector<uint32_t> &attrs) -> Schema * {
+  static auto CopySchema(const Schema *from, const std::vector<uint32_t> &attrs) -> Schema {
     std::vector<Column> cols;
     cols.reserve(attrs.size());
     for (const auto i : attrs) {
       cols.emplace_back(from->columns_[i]);
     }
-    return new Schema{cols};
+    return Schema{cols};
   }
 
   /** @return all the columns in the schema */
@@ -55,12 +60,25 @@ class Schema {
    * @return the index of a column with the given name, throws an exception if it does not exist
    */
   auto GetColIdx(const std::string &col_name) const -> uint32_t {
-    for (uint32_t i = 0; i < columns_.size(); ++i) {
-      if (columns_[i].GetName() == col_name) {
-        return i;
-      }
+    if (auto col_idx = TryGetColIdx(col_name)) {
+      return *col_idx;
     }
     UNREACHABLE("Column does not exist");
+  }
+
+  /**
+   * Looks up and returns the index of the first column in the schema with the specified name.
+   * If multiple columns have the same name, the first such index is returned.
+   * @param col_name name of column to look for
+   * @return the index of a column with the given name, `std::nullopt` if it does not exist
+   */
+  auto TryGetColIdx(const std::string &col_name) const -> std::optional<uint32_t> {
+    for (uint32_t i = 0; i < columns_.size(); ++i) {
+      if (columns_[i].GetName() == col_name) {
+        return std::optional{i};
+      }
+    }
+    return std::nullopt;
   }
 
   /** @return the indices of non-inlined columns */
@@ -79,7 +97,7 @@ class Schema {
   inline auto IsInlined() const -> bool { return tuple_is_inlined_; }
 
   /** @return string representation of this schema */
-  auto ToString() const -> std::string;
+  auto ToString(bool simplified = true) const -> std::string;
 
  private:
   /** Fixed-length column size, i.e. the number of bytes used by one tuple. */
@@ -89,10 +107,43 @@ class Schema {
   std::vector<Column> columns_;
 
   /** True if all the columns are inlined, false otherwise. */
-  bool tuple_is_inlined_;
+  bool tuple_is_inlined_{true};
 
   /** Indices of all uninlined columns. */
   std::vector<uint32_t> uninlined_columns_;
 };
 
 }  // namespace bustub
+
+template <typename T>
+struct fmt::formatter<T, std::enable_if_t<std::is_base_of<bustub::Schema, T>::value, char>>
+    : fmt::formatter<std::string> {
+  template <typename FormatCtx>
+  auto format(const bustub::Schema &x, FormatCtx &ctx) const {
+    return fmt::formatter<std::string>::format(x.ToString(), ctx);
+  }
+};
+
+template <typename T>
+struct fmt::formatter<std::shared_ptr<T>, std::enable_if_t<std::is_base_of<bustub::Schema, T>::value, char>>
+    : fmt::formatter<std::string> {
+  template <typename FormatCtx>
+  auto format(const std::shared_ptr<T> &x, FormatCtx &ctx) const {
+    if (x != nullptr) {
+      return fmt::formatter<std::string>::format(x->ToString(), ctx);
+    }
+    return fmt::formatter<std::string>::format("", ctx);
+  }
+};
+
+template <typename T>
+struct fmt::formatter<std::unique_ptr<T>, std::enable_if_t<std::is_base_of<bustub::Schema, T>::value, char>>
+    : fmt::formatter<std::string> {
+  template <typename FormatCtx>
+  auto format(const std::unique_ptr<T> &x, FormatCtx &ctx) const {
+    if (x != nullptr) {
+      return fmt::formatter<std::string>::format(x->ToString(), ctx);
+    }
+    return fmt::formatter<std::string>::format("", ctx);
+  }
+};

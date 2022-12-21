@@ -13,8 +13,11 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <utility>
+
+#include "fmt/format.h"
 
 #include "common/exception.h"
 #include "common/macros.h"
@@ -31,10 +34,9 @@ class Column {
    * Non-variable-length constructor for creating a Column.
    * @param column_name name of the column
    * @param type type of the column
-   * @param expr expression used to create this column
    */
-  Column(std::string column_name, TypeId type, const AbstractExpression *expr = nullptr)
-      : column_name_(std::move(column_name)), column_type_(type), fixed_length_(TypeSize(type)), expr_{expr} {
+  Column(std::string column_name, TypeId type)
+      : column_name_(std::move(column_name)), column_type_(type), fixed_length_(TypeSize(type)) {
     BUSTUB_ASSERT(type != TypeId::VARCHAR, "Wrong constructor for VARCHAR type.");
   }
 
@@ -45,10 +47,25 @@ class Column {
    * @param length length of the varlen
    * @param expr expression used to create this column
    */
-  Column(std::string column_name, TypeId type, uint32_t length, const AbstractExpression *expr = nullptr)
-      : column_name_(std::move(column_name)), column_type_(type), fixed_length_(TypeSize(type)), expr_{expr} {
+  Column(std::string column_name, TypeId type, uint32_t length)
+      : column_name_(std::move(column_name)),
+        column_type_(type),
+        fixed_length_(TypeSize(type)),
+        variable_length_(length) {
     BUSTUB_ASSERT(type == TypeId::VARCHAR, "Wrong constructor for non-VARCHAR type.");
   }
+
+  /**
+   * Replicate a Column with a different name.
+   * @param column_name name of the column
+   * @param column the original column
+   */
+  Column(std::string column_name, const Column &column)
+      : column_name_(std::move(column_name)),
+        column_type_(column.column_type_),
+        fixed_length_(column.fixed_length_),
+        variable_length_(column.variable_length_),
+        column_offset_(column.column_offset_) {}
 
   /** @return column name */
   auto GetName() const -> std::string { return column_name_; }
@@ -77,10 +94,7 @@ class Column {
   auto IsInlined() const -> bool { return column_type_ != TypeId::VARCHAR; }
 
   /** @return a string representation of this column */
-  auto ToString() const -> std::string;
-
-  /** @return the expression used to create this column */
-  auto GetExpr() const -> const AbstractExpression * { return expr_; }
+  auto ToString(bool simplified = true) const -> std::string;
 
  private:
   /**
@@ -91,7 +105,6 @@ class Column {
   static auto TypeSize(TypeId type) -> uint8_t {
     switch (type) {
       case TypeId::BOOLEAN:
-        return 1;
       case TypeId::TINYINT:
         return 1;
       case TypeId::SMALLINT:
@@ -125,9 +138,24 @@ class Column {
 
   /** Column offset in the tuple. */
   uint32_t column_offset_{0};
-
-  /** Expression used to create this column **/
-  const AbstractExpression *expr_;
 };
 
 }  // namespace bustub
+
+template <typename T>
+struct fmt::formatter<T, std::enable_if_t<std::is_base_of<bustub::Column, T>::value, char>>
+    : fmt::formatter<std::string> {
+  template <typename FormatCtx>
+  auto format(const bustub::Column &x, FormatCtx &ctx) const {
+    return fmt::formatter<std::string>::format(x.ToString(), ctx);
+  }
+};
+
+template <typename T>
+struct fmt::formatter<std::unique_ptr<T>, std::enable_if_t<std::is_base_of<bustub::Column, T>::value, char>>
+    : fmt::formatter<std::string> {
+  template <typename FormatCtx>
+  auto format(const std::unique_ptr<bustub::Column> &x, FormatCtx &ctx) const {
+    return fmt::formatter<std::string>::format(x->ToString(), ctx);
+  }
+};
