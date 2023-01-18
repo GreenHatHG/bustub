@@ -4,7 +4,8 @@ CMD bash
 # Install Ubuntu packages.
 # Please add packages in alphabetical order.
 ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get -y update && \
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list &&\
+    apt-get -y update && \
     apt-get -y install \
       build-essential \
       clang-12 \
@@ -15,4 +16,7 @@ RUN apt-get -y update && \
       git \
       g++-12 \
       pkg-config \
-      zlib1g-dev
+      zlib1g-dev \
+      gcc-12 \
+      make \
+      gdb
