@@ -296,44 +296,37 @@ class Trie {
       return false;
     }
 
-    std::unique_ptr<TrieNode>* node = &root_;
+    // 遍历树，一直遍历到能够遍历最深的地方
+    std::unique_ptr<TrieNode>*current_node = &root_;
     size_t index = 0; //指向下一个待要比较的下标
     size_t key_len = key.length();
-    char key_char = '\0';
-    while(node->get()->GetKeyChar() == key_char && index < key_len){
-      key_char = key[index];
-      node = node->get()->GetChildNode(key_char);
-      if(!node){
+    for(; index < key_len; ++index){
+      char key_char = key[index];
+      if(!current_node->get()->HasChild(key_char)){
         break;
       }
-      ++index;
-    }
-    // 存在重复的key
-
-    bool ending = node->get()->IsEndNode();
-    if(ending && index == key_len){
-      return false;
+      current_node = current_node->get()->GetChildNode(key_char);
     }
 
+    if(index == key_len){
+      bool is_end = current_node->get()->IsEndNode();
+      // 存在重复的key
+      if(is_end){
+        return false;
+      }
+      current_node->get() = TrieNodeWithValue(current_node, value);
+      return true;
+    }
 
-    return false;
+    for(; index < key_len; ++index){
+      char key_char = key[index];
+      current_node->get()->InsertChildNode(key_char, std::make_unique<TrieNode>(key_char));
+      current_node = current_node->get()->GetChildNode(key_char);
+    }
+    current_node->get() = TrieNodeWithValue(current_node, value);
+    return true;
   }
 
-  bool HasDuplicate(const std::string& key) const{
-    //    const char key_char = key[keyIndex];
-    //    const auto trie_node = root->get();
-    //    // 当前节点的key不等于要判断的key
-    //    if(trie_node->GetKeyChar() != key_char){
-    //      return false;
-    //    }
-    //    // 遍历到最后一个node，并且key也是相等的
-    //    if(!trie_node->HasChildren() && trie_node->GetKeyChar() == key_char){
-    //      return true;
-    //    }
-    //    auto next_trie_node = root_->GetChildNode(key_char);
-    //    return HasDuplicate(key, keyIndex+1, next_trie_node);
-    return false;
-  }
 
   /**
    * TODO(P0): Add implementation
@@ -352,7 +345,41 @@ class Trie {
    * @param key Key used to traverse the trie and find the correct node
    * @return True if the key exists and is removed, false otherwise
    */
-  bool Remove(const std::string &key) { return false; }
+  bool Remove(const std::string &key) {
+    if(key.empty()){
+      return false;
+    }
+
+    std::unique_ptr<TrieNode>*current_node = &root_;
+    for(char c: key){
+      if(!current_node->get()->HasChild(c)){
+        return false;
+      }
+      current_node = current_node->get()->GetChildNode(c);
+    }
+
+    if(!current_node->get()->HasChildren()){
+      RecursivelyRemoveNode(key, &root_, 0);
+    }else{
+      current_node->get()->SetEndNode(false);
+    }
+    return true;
+  }
+
+  void RecursivelyRemoveNode(const std::string &key, std::unique_ptr<TrieNode>* root, size_t depth){
+    if(depth == key.size() - 1){
+      delete(root->get()->GetChildNode(key[depth]));
+      root->get()->RemoveChildNode(key[depth]);
+      return;
+    }
+
+    RecursivelyRemoveNode(key, root->get()->GetChildNode(key[depth]), depth + 1);
+
+    if(!root->get()->HasChildren() && !root->get()->IsEndNode()){
+      delete(root->get()->GetChildNode(key[depth]));
+      root->get()->RemoveChildNode(key[depth]);
+    }
+  }
 
   /**
    * TODO(P0): Add implementation
@@ -374,8 +401,26 @@ class Trie {
    */
   template <typename T>
   T GetValue(const std::string &key, bool *success) {
+    if(key.empty()){
+      *success = false;
+      return;
+    }
+
+    std::unique_ptr<TrieNode>*current_node = &root_;
+    for(char c: key) {
+      if (!current_node->get()->HasChild(c)) {
+        *success = false;
+        return;
+      }
+      current_node = current_node->get()->GetChildNode(c);
+    }
+
+    auto with_value = std::dynamic_pointer_cast<std::unique_ptr<TrieNodeWithValue<T>>*>(current_node);
+    if(with_value){
+      *success = true;
+      return with_value->get()->GetValue();
+    }
     *success = false;
-    return {};
   }
 };
 
