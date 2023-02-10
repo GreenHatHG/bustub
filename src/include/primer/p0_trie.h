@@ -225,8 +225,7 @@ class TrieNodeWithValue : public TrieNode {
    * @param key_char Key char of this node
    * @param value Value of this node
    */
-  TrieNodeWithValue(char key_char, T value): TrieNode(key_char) {
-    value_ = value;
+  TrieNodeWithValue(char key_char, T value): TrieNode(key_char), value_{value} {
     SetEndNode(true);
   }
 
@@ -297,7 +296,7 @@ class Trie {
     }
 
     // 遍历树，一直遍历到能够遍历最深的地方
-    std::unique_ptr<TrieNode>*current_node = &root_;
+    std::unique_ptr<TrieNode>* current_node = &root_;
     size_t index = 0; //指向下一个待要比较的下标
     size_t key_len = key.length();
     for(; index < key_len; ++index){
@@ -314,7 +313,7 @@ class Trie {
       if(is_end){
         return false;
       }
-      current_node->get() = TrieNodeWithValue(current_node, value);
+      ConvertToTrieNodeWithValue(current_node, value);
       return true;
     }
 
@@ -323,10 +322,16 @@ class Trie {
       current_node->get()->InsertChildNode(key_char, std::make_unique<TrieNode>(key_char));
       current_node = current_node->get()->GetChildNode(key_char);
     }
-    current_node->get() = TrieNodeWithValue(current_node, value);
+    ConvertToTrieNodeWithValue(current_node, value);
     return true;
   }
 
+  template <typename T>
+  void ConvertToTrieNodeWithValue(std::unique_ptr<TrieNode>* currentNode, T value) {
+    auto new_node = std::make_unique<TrieNodeWithValue<T>>(std::move(*currentNode), value);
+    TrieNodeWithValue<T>* raw_pointer = new_node.release();
+    currentNode->reset(raw_pointer);
+  }
 
   /**
    * TODO(P0): Add implementation
@@ -403,24 +408,26 @@ class Trie {
   T GetValue(const std::string &key, bool *success) {
     if(key.empty()){
       *success = false;
-      return;
+      return T{};
     }
 
     std::unique_ptr<TrieNode>*current_node = &root_;
     for(char c: key) {
       if (!current_node->get()->HasChild(c)) {
         *success = false;
-        return;
+        return T{};
       }
       current_node = current_node->get()->GetChildNode(c);
     }
 
-    auto with_value = std::dynamic_pointer_cast<std::unique_ptr<TrieNodeWithValue<T>>*>(current_node);
-    if(with_value){
+    auto* converted_node = dynamic_cast<TrieNodeWithValue<T>*>(current_node->get());
+    if(converted_node){
       *success = true;
-      return with_value->get()->GetValue();
+      return converted_node->GetValue();
     }
+
     *success = false;
+    return T{};
   }
 };
 
