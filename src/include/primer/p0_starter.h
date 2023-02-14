@@ -96,9 +96,7 @@ class Matrix {
    * Destroy a matrix instance.
    * TODO(P0): Add implementation
    */
-  virtual ~Matrix() {
-      delete[] this->linear_;
-  };
+  virtual ~Matrix() { delete[] this->linear_; }
 };
 
 /**
@@ -116,8 +114,8 @@ class RowMatrix : public Matrix<T> {
    * @param cols The number of columns
    */
   RowMatrix(int rows, int cols) : Matrix<T>(rows, cols) {
-    this->data_ = new T*[this->rows_];
-    for (int i = 0; i < this->rows_; i++){
+    this->data_ = new T *[this->rows_];
+    for (int i = 0; i < this->rows_; i++) {
       this->data_[i] = new T[this->cols_];
     }
   }
@@ -147,7 +145,7 @@ class RowMatrix : public Matrix<T> {
    * @throws OUT_OF_RANGE if either index is out of range
    */
   auto GetElement(int i, int j) const -> T override {
-    if(i < 0 || j < 0 || i >= this->rows_ || j >= this->cols_){
+    if (i < 0 || j < 0 || i >= this->rows_ || j >= this->cols_) {
       throw Exception(ExceptionType::OUT_OF_RANGE, "index is out of range");
     }
     return this->data_[i][j];
@@ -164,7 +162,7 @@ class RowMatrix : public Matrix<T> {
    * @throws OUT_OF_RANGE if either index is out of range
    */
   void SetElement(int i, int j, T val) override {
-    if(i < 0 || j < 0 || i >= this->rows_ || j >= this->cols_){
+    if (i < 0 || j < 0 || i >= this->rows_ || j >= this->cols_) {
       throw Exception(ExceptionType::OUT_OF_RANGE, "index is out of range");
     }
     this->data_[i][j] = val;
@@ -200,7 +198,7 @@ class RowMatrix : public Matrix<T> {
    * Destroy a RowMatrix instance.
    */
   ~RowMatrix() override {
-    for(int i = 0; i < this->rows_; i++){
+    for (int i = 0; i < this->rows_; i++) {
       delete[] this->data_[i];
     }
     delete[] this->data_;
