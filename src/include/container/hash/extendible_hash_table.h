@@ -105,6 +105,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
    */
   auto Remove(const K &key) -> bool override;
 
+
   /**
    * Bucket class for each hash table bucket that the directory points to.
    */
@@ -112,8 +113,13 @@ class ExtendibleHashTable : public HashTable<K, V> {
    public:
     explicit Bucket(size_t size, int depth = 0);
 
+    inline void SetList(std::list<std::pair<K, V>>&& other_list){
+      list_.clear();
+      list_ = std::move(other_list);
+    }
+
     /** @brief Check if a bucket is full. */
-    inline auto IsFull() const -> bool { return list_.size() == size_; }
+    inline auto IsFull() const -> bool { return list_.size() >= size_; }
 
     /** @brief Get the local depth of the bucket. */
     inline auto GetDepth() const -> int { return depth_; }
@@ -132,12 +138,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
      * @param[out] value The value associated with the key.
      * @return True if the key is found, false otherwise.
      */
-    auto Find(const K &key, V &value) -> bool {
-      auto it = std::find_if(list_.begin(), list_.end(), [&key, &value](const std::pair<K, V> &element) {
-        return element.first == key && element.second == value;
-      });
-      return it != list_.end();
-    }
+    auto Find(const K &key, V &value) -> bool;
 
     /**
      *
@@ -147,20 +148,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
      * @param key The key to be deleted.
      * @return True if the key exists, false otherwise.
      */
-    auto Remove(const K &key) -> bool {
-      // 当找到元素时，std::remove_if函数将把该元素移到列表的末尾，并返回指向新的结尾的迭代器。
-      // 最后，函数使用std::list的成员函数erase来删除移动到列表末尾的元素。这将删除所有具有给定key值的元素
-      // 由于std::remove_if函数并没有真正删除元素，因此我们需要使用std::list的成员函数erase来真正删除元素。
-      // 这种删除方法可以避免在删除元素时破坏std::list的迭代器，从而确保程序的正确性
-      auto it = std::remove_if(
-          list_.begin(), list_.end(), [&key](const std::pair<K, V> &element) { return element.first == key; },
-          list_.end());
-      if (it != list_.end) {
-        list_.erase(it, list_.end());
-        return true;
-      }
-      return false;
-    }
+    auto Remove(const K &key) -> bool;
 
     /**
      *
@@ -173,22 +161,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
      * @param value The value to be inserted.
      * @return True if the key-value pair is inserted, false otherwise.
      */
-    auto Insert(const K &key, const V &value) -> bool {
-      if (IsFull()) {
-        return false;
-      }
-
-      auto it = std::find_if(list_.begin(), list_.end(),
-                             [&key](const std::pair<K, V> &element) { return element.first == key; });
-      // 找到了具有特定key的元素，更新其value值
-      if (it != list_.end()) {
-        it->second = value;
-        return false;
-      }
-      // 未找到具有特定key的元素，插入新元素到std::list的末尾
-      list_.emplace_back(key, value);
-      return  true;
-    }
+    auto Insert(const K &key, const V &value) -> bool;
 
    private:
     // TODO(student): You may add additional private members and helper functions
@@ -229,6 +202,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
   auto GetGlobalDepthInternal() const -> int;
   auto GetLocalDepthInternal(int dir_index) const -> int;
   auto GetNumBucketsInternal() const -> int;
+  auto FindBucket(const K &key) -> std::tuple<std::shared_ptr<Bucket>, size_t>;
 };
 
 }  // namespace bustub

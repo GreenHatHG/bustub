@@ -14,9 +14,7 @@ RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.l
       cmake \
       doxygen \
       git \
-      g++-12 \
       pkg-config \
       zlib1g-dev \
-      gcc-12 \
-      make \
       gdb
+
