@@ -20,9 +20,9 @@
 #include <list>
 #include <memory>
 #include <mutex>  // NOLINT
+#include <tuple>
 #include <utility>
 #include <vector>
-
 #include "container/hash/hash_table.h"
 
 namespace bustub {
@@ -105,7 +105,6 @@ class ExtendibleHashTable : public HashTable<K, V> {
    */
   auto Remove(const K &key) -> bool override;
 
-
   /**
    * Bucket class for each hash table bucket that the directory points to.
    */
@@ -113,7 +112,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
    public:
     explicit Bucket(size_t size, int depth = 0);
 
-    inline void SetList(std::list<std::pair<K, V>>&& other_list){
+    inline void SetList(std::list<std::pair<K, V>> &&other_list) {
       list_.clear();
       list_ = std::move(other_list);
     }

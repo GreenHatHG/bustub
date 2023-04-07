@@ -15,13 +15,13 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>  // NOLINT
+#include <shared_mutex>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <mutex>  // NOLINT
-#include <shared_mutex>
 
 #include "common/exception.h"
 #include "common/logger.h"
@@ -94,7 +94,7 @@ class TrieNode {
    * @param key_char Key char of child node.
    * @return True if this trie node has a child with given key, false otherwise.
    */
-  bool HasChild(char key_char) const { return children_.find(key_char) != children_.end(); }
+  auto HasChild(char key_char) const -> bool { return children_.find(key_char) != children_.end(); }
 
   /**
    * TODO(P0): Add implementation
@@ -104,7 +104,7 @@ class TrieNode {
    *
    * @return True if this trie node has any child node, false if it has no child node.
    */
-  bool HasChildren() const { return !children_.empty(); }
+  auto HasChildren() const -> bool { return !children_.empty(); }
 
   /**
    * TODO(P0): Add implementation
@@ -113,7 +113,7 @@ class TrieNode {
    *
    * @return True if is_end_ flag is true, false if is_end_ is false.
    */
-  bool IsEndNode() const { return is_end_; }
+  auto IsEndNode() const -> bool { return is_end_; }
 
   /**
    * TODO(P0): Add implementation
@@ -122,7 +122,7 @@ class TrieNode {
    *
    * @return key_char_ of this trie node.
    */
-  char GetKeyChar() const { return key_char_; }
+  auto GetKeyChar() const -> char { return key_char_; }
 
   /**
    * TODO(P0): Add implementation
@@ -143,7 +143,7 @@ class TrieNode {
    * @param child Unique pointer created for the child node. This should be added to children_ map.
    * @return Pointer to unique_ptr of the inserted child node. If insertion fails, return nullptr.
    */
-  std::unique_ptr<TrieNode> *InsertChildNode(char key_char, std::unique_ptr<TrieNode> &&child) {
+  auto InsertChildNode(char key_char, std::unique_ptr<TrieNode> &&child) -> std::unique_ptr<TrieNode> * {
     if (HasChild(key_char) || key_char != child->key_char_) {
       return nullptr;
     }
@@ -161,7 +161,7 @@ class TrieNode {
    * @return Pointer to unique_ptr of the child node, nullptr if child
    *         node does not exist.
    */
-  std::unique_ptr<TrieNode> *GetChildNode(char key_char) {
+  auto GetChildNode(char key_char) -> std::unique_ptr<TrieNode> * {
     if (!HasChild(key_char)) {
       return nullptr;
     }
@@ -261,7 +261,7 @@ class TrieNodeWithValue : public TrieNode {
    *
    * @return Value of type T stored in this node
    */
-  T GetValue() const { return value_; }
+  auto GetValue() const -> T { return value_; }
 };
 
 /**
@@ -313,7 +313,7 @@ class Trie {
    */
 
   template <typename T>
-  bool Insert(const std::string &key, T value) {
+  auto Insert(const std::string &key, T value) -> bool {
     if (key.empty()) {
       return false;
     }
@@ -373,7 +373,7 @@ class Trie {
    * @param key Key used to traverse the trie and find the correct node
    * @return True if the key exists and is removed, false otherwise
    */
-  bool Remove(const std::string &key) {
+  auto Remove(const std::string &key) -> bool {
     if (key.empty()) {
       return false;
     }
@@ -395,8 +395,8 @@ class Trie {
     return true;
   }
 
-  std::unique_ptr<TrieNode> *RecursivelyRemoveNode(const std::string &key, std::unique_ptr<TrieNode> *root,
-                                                   size_t depth) {
+  auto RecursivelyRemoveNode(const std::string &key, std::unique_ptr<TrieNode> *root,
+                                                   size_t depth) -> std::unique_ptr<TrieNode> * {
     // 返回值代表上一个节点有没有被删除
     // 作用是使其父节点将其删除，从达到从底向上遍历的效果
 
@@ -450,7 +450,7 @@ class Trie {
    * @return Value of type T if type matches
    */
   template <typename T>
-  T GetValue(const std::string &key, bool *success) {
+  auto GetValue(const std::string &key, bool *success) -> T {
     if (key.empty()) {
       *success = false;
       return T{};

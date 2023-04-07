@@ -24,7 +24,7 @@ auto ClearMsb(int num) -> int {
   if (num == 0) {
     return 0;
   }
-  int mask = 0x7FFFFFFF; // 0111 1111 1111 1111 1111 1111 1111 1111
+  int mask = 0x7FFFFFFF;  // 0111 1111 1111 1111 1111 1111 1111 1111
   while ((num & mask) != 0) {
     mask >>= 1;
   }
@@ -37,7 +37,7 @@ template <typename K, typename V>
 ExtendibleHashTable<K, V>::ExtendibleHashTable(size_t bucket_size)
     : global_depth_(1), bucket_size_(bucket_size), num_buckets_(2) {
   GetTestFileContent();
-//  dir_.assign(2, std::make_shared<Bucket>(Bucket(bucket_size, 1)));
+  //  dir_.assign(2, std::make_shared<Bucket>(Bucket(bucket_size, 1)));
   dir_ = {std::make_shared<Bucket>(Bucket(bucket_size, 1)), std::make_shared<Bucket>(Bucket(bucket_size, 1))};
 }
 
@@ -107,12 +107,12 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   std::scoped_lock<std::mutex> lock(latch_);
   const auto [key_bucket, key_dir_index] = FindBucket(key);
 
-  if(!key_bucket->IsFull()){
+  if (!key_bucket->IsFull()) {
     key_bucket->Insert(key, value);
     return;
   }
 
-  if(global_depth_ > key_bucket->GetDepth()){
+  if (global_depth_ > key_bucket->GetDepth()) {
     key_bucket->IncrementDepth();
     std::unordered_map<std::size_t, std::list<std::pair<K, V>>> divided_bucket_map;
     for (auto [k, v] : key_bucket->GetItems()) {
@@ -120,7 +120,7 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
       divided_bucket_map[dir_index].push_back(std::pair<K, V>(k, v));
     }
 
-    for (auto& m : divided_bucket_map) {
+    for (auto &m : divided_bucket_map) {
       auto dir_index = m.first;
       auto pair_list = m.second;
       auto new_bucket = std::make_shared<Bucket>(Bucket(bucket_size_, key_bucket->GetDepth()));
@@ -141,7 +141,7 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
     divided_bucket_map[dir_index].push_back(std::pair<K, V>(k, v));
   }
 
-  for (auto& m : divided_bucket_map) {
+  for (auto &m : divided_bucket_map) {
     auto dir_index = m.first;
     auto pair_list = m.second;
     auto new_bucket = std::make_shared<Bucket>(Bucket(bucket_size_, key_bucket->GetDepth()));
@@ -151,13 +151,13 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   const auto [new_key_bucket, _] = FindBucket(key);
   new_key_bucket->Insert(key, value);
 
-  for(int i = 0; i < global_depth_*2; i++){
-    if(dir_[i]){
+  for (int i = 0; i < global_depth_ * 2; i++) {
+    if (dir_[i]) {
       continue;
     }
     int clear_msb = ClearMsb(i);
-    if(dir_[clear_msb]){
-        dir_[i] = dir_[clear_msb];
+    if (dir_[clear_msb]) {
+      dir_[i] = dir_[clear_msb];
     }
   }
 }
@@ -170,10 +170,10 @@ ExtendibleHashTable<K, V>::Bucket::Bucket(size_t array_size, int depth) : size_(
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Bucket::Find(const K &key, V &value) -> bool {
-  for(auto& p : list_){
+  for (auto &p : list_) {
     if (p.first == key) {
-        value = p.second;
-        return true;
+      value = p.second;
+      return true;
     }
   }
   return false;
@@ -185,8 +185,8 @@ auto ExtendibleHashTable<K, V>::Bucket::Remove(const K &key) -> bool {
   // 最后，函数使用std::list的成员函数erase来删除移动到列表末尾的元素。这将删除所有具有给定key值的元素
   // 由于std::remove_if函数并没有真正删除元素，因此我们需要使用std::list的成员函数erase来真正删除元素。
   // 这种删除方法可以避免在删除元素时破坏std::list的迭代器，从而确保程序的正确性
-  auto it = std::remove_if(
-      list_.begin(), list_.end(), [&key](const std::pair<K, V> &element) { return element.first == key; });
+  auto it = std::remove_if(list_.begin(), list_.end(),
+                           [&key](const std::pair<K, V> &element) { return element.first == key; });
   if (it != list_.end()) {
     list_.erase(it, list_.end());
     return true;
@@ -200,8 +200,8 @@ auto ExtendibleHashTable<K, V>::Bucket::Insert(const K &key, const V &value) -> 
     return false;
   }
 
-  auto it = std::find_if(list_.begin(), list_.end(),
-                         [&key](const std::pair<K, V> &element) { return element.first == key; });
+  auto it =
+      std::find_if(list_.begin(), list_.end(), [&key](const std::pair<K, V> &element) { return element.first == key; });
   // 找到了具有特定key的元素，更新其value值
   if (it != list_.end()) {
     it->second = value;

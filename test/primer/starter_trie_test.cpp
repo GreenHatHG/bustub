@@ -229,8 +229,8 @@ TEST(StarterTrieNodeTest, TrieNodeConstructorTest) {
   }
 
   /**
- * When move constructor for TrieNode is called, the new TrieNode should
- * be able to access old node's children
+   * When move constructor for TrieNode is called, the new TrieNode should
+   * be able to access old node's children
    */
   {
     auto t = TrieNode('a');
