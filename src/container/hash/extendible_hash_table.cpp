@@ -11,13 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #include <cassert>
-#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <list>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "container/hash/extendible_hash_table.h"
-#include "primer/p0_trie.h"
 #include "storage/page/page.h"
 
 auto ClearMsb(int num) -> int {
@@ -36,7 +39,6 @@ namespace bustub {
 template <typename K, typename V>
 ExtendibleHashTable<K, V>::ExtendibleHashTable(size_t bucket_size)
     : global_depth_(1), bucket_size_(bucket_size), num_buckets_(2) {
-  GetTestFileContent();
   //  dir_.assign(2, std::make_shared<Bucket>(Bucket(bucket_size, 1)));
   dir_ = {std::make_shared<Bucket>(Bucket(bucket_size, 1)), std::make_shared<Bucket>(Bucket(bucket_size, 1))};
 }

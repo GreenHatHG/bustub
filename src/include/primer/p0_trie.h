@@ -395,8 +395,8 @@ class Trie {
     return true;
   }
 
-  auto RecursivelyRemoveNode(const std::string &key, std::unique_ptr<TrieNode> *root,
-                                                   size_t depth) -> std::unique_ptr<TrieNode> * {
+  auto RecursivelyRemoveNode(const std::string &key, std::unique_ptr<TrieNode> *root, size_t depth)
+      -> std::unique_ptr<TrieNode> * {
     // 返回值代表上一个节点有没有被删除
     // 作用是使其父节点将其删除，从达到从底向上遍历的效果
 
