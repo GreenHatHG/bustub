@@ -15,7 +15,9 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iostream>
 #include <list>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -23,24 +25,26 @@
 #include "container/hash/extendible_hash_table.h"
 #include "storage/page/page.h"
 
-auto ClearMsb(int num) -> int {
-  if (num == 0) {
-    return 0;
+auto ClearLeftMostBit(int num) -> int {
+  if (num < 0) {
+    return num;
   }
-  int mask = 0x7FFFFFFF;  // 0111 1111 1111 1111 1111 1111 1111 1111
-  while ((num & mask) != 0) {
-    mask >>= 1;
-  }
-  return num & mask;
+  return num & ~(1 << (sizeof(num) * 8 - __builtin_clz(num) - 1));
+}
+
+auto SetBit(const int num, const int n) -> int {
+  int mask = 1 << (n - 1);  // 生成掩码，将第n位设为1
+  return num | mask;        // 使用按位或运算将num的第n位设为1
 }
 
 namespace bustub {
 
 template <typename K, typename V>
 ExtendibleHashTable<K, V>::ExtendibleHashTable(size_t bucket_size)
-    : global_depth_(1), bucket_size_(bucket_size), num_buckets_(2) {
+    : global_depth_(0), bucket_size_(bucket_size), num_buckets_(1) {
   //  dir_.assign(2, std::make_shared<Bucket>(Bucket(bucket_size, 1)));
-  dir_ = {std::make_shared<Bucket>(Bucket(bucket_size, 1)), std::make_shared<Bucket>(Bucket(bucket_size, 1))};
+  std::cout << "[Init] bucket_size:" << bucket_size << std::endl;
+  dir_ = {std::make_shared<Bucket>(bucket_size, 0)};
 }
 
 template <typename K, typename V>
@@ -85,7 +89,7 @@ auto ExtendibleHashTable<K, V>::GetNumBucketsInternal() const -> int {
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::FindBucket(const K &key) -> std::tuple<std::shared_ptr<Bucket>, size_t> {
   auto dir_index = IndexOf(key);
-  std::cout << key << " dir_index:" << dir_index << std::endl;
+  std::cout << "[FindBucket] key:" << key << ", dir_index:" << dir_index << std::endl;
   std::shared_ptr<Bucket> bucket = dir_[dir_index];
   return std::make_tuple(bucket, dir_index);
 }
@@ -104,18 +108,34 @@ auto ExtendibleHashTable<K, V>::Remove(const K &key) -> bool {
   return bucket->Remove(key);
 }
 
+auto operator<<(std::ostream &os, const std::list<Page *>::iterator &it) -> std::ostream & {
+  os << *it;
+  return os;
+}
+
+auto operator<<(std::ostream &os, const std::list<int>::iterator &it) -> std::ostream & {
+  os << *it;
+  return os;
+}
+
 template <typename K, typename V>
 void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   std::scoped_lock<std::mutex> lock(latch_);
+  std::cout << "===========[Insert]"
+            << "key: " << key << " ,value:" << value << std::endl;
   const auto [key_bucket, key_dir_index] = FindBucket(key);
 
   if (!key_bucket->IsFull()) {
+    std::cout << "[Insert] key_bucket not full, insert success" << std::endl;
     key_bucket->Insert(key, value);
+    PrintDir();
     return;
   }
 
+  num_buckets_++;
+  key_bucket->IncrementDepth();
   if (global_depth_ > key_bucket->GetDepth()) {
-    key_bucket->IncrementDepth();
+    std::cout << "[Insert] global_depth_ > local depth" << std::endl;
     std::unordered_map<std::size_t, std::list<std::pair<K, V>>> divided_bucket_map;
     for (auto [k, v] : key_bucket->GetItems()) {
       auto dir_index = IndexOf(k);
@@ -125,50 +145,79 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
     for (auto &m : divided_bucket_map) {
       auto dir_index = m.first;
       auto pair_list = m.second;
-      auto new_bucket = std::make_shared<Bucket>(Bucket(bucket_size_, key_bucket->GetDepth()));
-      new_bucket->SetList(std::move(pair_list));
-      dir_[dir_index] = new_bucket;
+      if (dir_[dir_index]) {
+        dir_[dir_index]->SetList(std::move(pair_list));
+      } else {
+        auto new_bucket = std::make_shared<Bucket>(Bucket(bucket_size_, key_bucket->GetDepth()));
+        new_bucket->SetList(std::move(pair_list));
+        dir_[dir_index] = new_bucket;
+      }
     }
 
-    key_bucket->Insert(key, value);
+    // "key_bucket" may have changed, so the "key_bucket" variable cannot be used again.
+    dir_[key_dir_index]->Insert(key, value);
+    PrintDir();
     return;
   }
 
+  std::cout << "[Insert] directory double" << std::endl;
   dir_.resize(dir_.size() * 2);
   global_depth_++;
-  key_bucket->IncrementDepth();
+
   std::unordered_map<std::size_t, std::list<std::pair<K, V>>> divided_bucket_map;
   for (auto [k, v] : key_bucket->GetItems()) {
     auto dir_index = IndexOf(k);
     divided_bucket_map[dir_index].push_back(std::pair<K, V>(k, v));
   }
 
+  std::cout << "[Insert] divided_bucket_map:" << std::endl;
+  for (auto &m : divided_bucket_map) {
+    std::cout << "dir_index " << m.first << " pair list: ";
+    for (auto &p : m.second) {
+      std::cout << "(" << p.first << ", " << p.second << ") ";
+    }
+    std::cout << std::endl;
+  }
+
   for (auto &m : divided_bucket_map) {
     auto dir_index = m.first;
     auto pair_list = m.second;
-    auto new_bucket = std::make_shared<Bucket>(Bucket(bucket_size_, key_bucket->GetDepth()));
-    new_bucket->SetList(std::move(pair_list));
-    dir_[dir_index] = new_bucket;
+    if (dir_[dir_index]) {
+      dir_[dir_index]->SetList(std::move(pair_list));
+    } else {
+      auto new_bucket = std::make_shared<Bucket>(Bucket(bucket_size_, key_bucket->GetDepth()));
+      new_bucket->SetList(std::move(pair_list));
+      dir_[dir_index] = new_bucket;
+    }
   }
-  const auto [new_key_bucket, _] = FindBucket(key);
-  new_key_bucket->Insert(key, value);
 
-  for (int i = 0; i < global_depth_ * 2; i++) {
+  // 增加多一个bucket，但是bucket里面的key重新hash后还是落在原来bucket，所以需要补充一个空的bucket
+  if (divided_bucket_map.size() == 1) {
+    const int set_bit = SetBit(key_dir_index, global_depth_);
+    dir_[set_bit] = std::make_shared<Bucket>(Bucket(bucket_size_, key_bucket->GetDepth()));
+  }
+
+  for (size_t i = 0; i < dir_.size(); i++) {
     if (dir_[i]) {
       continue;
     }
-    int clear_msb = ClearMsb(i);
+    int clear_msb = ClearLeftMostBit(i);
     if (dir_[clear_msb]) {
       dir_[i] = dir_[clear_msb];
     }
   }
+
+  const auto [new_key_bucket, _] = FindBucket(key);
+  new_key_bucket->Insert(key, value);
+
+  PrintDir();
 }
 
 //===--------------------------------------------------------------------===//
 // Bucket
 //===--------------------------------------------------------------------===//
 template <typename K, typename V>
-ExtendibleHashTable<K, V>::Bucket::Bucket(size_t array_size, int depth) : size_(array_size), depth_(depth) {}
+ExtendibleHashTable<K, V>::Bucket::Bucket(size_t array_size, int depth) : size_{array_size}, depth_{depth} {}
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Bucket::Find(const K &key, V &value) -> bool {

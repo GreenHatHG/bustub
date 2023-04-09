@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <list>
 #include <memory>
 #include <mutex>  // NOLINT
@@ -104,6 +105,18 @@ class ExtendibleHashTable : public HashTable<K, V> {
    * @return True if the key exists, false otherwise.
    */
   auto Remove(const K &key) -> bool override;
+
+  auto PrintDir() -> void {
+    std::cout << "dir_ global depth: " << global_depth_ << std::endl;
+    for (size_t i = 0; i < dir_.size(); i++) {
+      std::cout << i << " local depth(" << dir_[i]->GetDepth() << ")"
+                << ": [";
+      for (auto [k, v] : dir_[i]->GetItems()) {
+        std::cout << k << ",";
+      }
+      std::cout << "]" << std::endl;
+    }
+  };
 
   /**
    * Bucket class for each hash table bucket that the directory points to.
