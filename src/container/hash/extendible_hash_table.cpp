@@ -118,6 +118,7 @@ auto operator<<(std::ostream &os, const std::list<int>::iterator &it) -> std::os
   return os;
 }
 
+
 template <typename K, typename V>
 void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   std::scoped_lock<std::mutex> lock(latch_);
@@ -125,16 +126,21 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
             << "key: " << key << " ,value:" << value << std::endl;
   const auto [key_bucket, key_dir_index] = FindBucket(key);
 
-  if (!key_bucket->IsFull()) {
-    std::cout << "[Insert] key_bucket not full, insert success" << std::endl;
+  V temp;
+  if (key_bucket->Find(key, temp)) {
+    std::cout << "[Insert] key already exists, the value should be updated" << std::endl;
     key_bucket->Insert(key, value);
     PrintDir();
     return;
   }
 
+  while(key_bucket->IsFull()){
+
+  }
+
   num_buckets_++;
-  key_bucket->IncrementDepth();
   if (global_depth_ > key_bucket->GetDepth()) {
+    key_bucket->IncrementDepth();
     std::cout << "[Insert] global_depth_ > local depth" << std::endl;
     std::unordered_map<std::size_t, std::list<std::pair<K, V>>> divided_bucket_map;
     for (auto [k, v] : key_bucket->GetItems()) {
@@ -142,16 +148,22 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
       divided_bucket_map[dir_index].push_back(std::pair<K, V>(k, v));
     }
 
+    std::cout << "[Insert] divided_bucket_map:" << std::endl;
+    for (auto &m : divided_bucket_map) {
+      std::cout << "dir_index " << m.first << " pair list: ";
+      for (auto &p : m.second) {
+        std::cout << "(" << p.first << ", " << p.second << ") ";
+      }
+      std::cout << std::endl;
+    }
+
+    // 这里因为是要拆分，所以直接赋值即可，不需要调用SetList更新，否则会同步影响到别的bucket
     for (auto &m : divided_bucket_map) {
       auto dir_index = m.first;
       auto pair_list = m.second;
-      if (dir_[dir_index]) {
-        dir_[dir_index]->SetList(std::move(pair_list));
-      } else {
-        auto new_bucket = std::make_shared<Bucket>(Bucket(bucket_size_, key_bucket->GetDepth()));
-        new_bucket->SetList(std::move(pair_list));
-        dir_[dir_index] = new_bucket;
-      }
+      auto new_bucket = std::make_shared<Bucket>(Bucket(bucket_size_, key_bucket->GetDepth()));
+      new_bucket->SetList(std::move(pair_list));
+      dir_[dir_index] = new_bucket;
     }
 
     // "key_bucket" may have changed, so the "key_bucket" variable cannot be used again.
@@ -162,6 +174,7 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
 
   std::cout << "[Insert] directory double" << std::endl;
   dir_.resize(dir_.size() * 2);
+  key_bucket->IncrementDepth();
   global_depth_++;
 
   std::unordered_map<std::size_t, std::list<std::pair<K, V>>> divided_bucket_map;

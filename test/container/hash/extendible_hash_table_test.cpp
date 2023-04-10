@@ -111,9 +111,16 @@ TEST(ExtendibleHashTableTest, SampleTest2) {
 }
 
 TEST(ExtendibleHashTableTest, InsertSplit) {
-  auto table = std::make_unique<ExtendibleHashTable<int, int>>(2);
+  auto table = std::make_unique<ExtendibleHashTable<int, std::string>>(2);
   EXPECT_EQ(0, table->GetGlobalDepth());
   EXPECT_EQ(1, table->GetNumBuckets());
+  table->Insert(1, "a");
+  table->Insert(2, "b");
+  table->Insert(3, "c");
+  table->Insert(4, "d");
+  table->Insert(5, "e");
+  table->Insert(6, "f");
+  EXPECT_EQ(2, table->GetGlobalDepth());
 }
 
 TEST(ExtendibleHashTableTest, InsertMultipleSplit) {
@@ -121,6 +128,7 @@ TEST(ExtendibleHashTableTest, InsertMultipleSplit) {
   table->Insert(0, 0);
   table->Insert(1024, 1024);
   table->Insert(4, 4);
+  EXPECT_EQ(4, table->GetNumBuckets());
 }
 
 TEST(ExtendibleHashTableTest, ConcurrentInsertTest2) {
