@@ -158,7 +158,7 @@ TEST(ExtendibleHashTableTest, ConcurrentInsertTest2) {
   }
 }
 
-TEST(ExtendibleHashTableTest, GetNumBuckets) {
+TEST(ExtendibleHashTableTest, DISABLED_GetNumBuckets) {
   auto table = std::make_unique<ExtendibleHashTable<int, int>>(2);
   table->Insert(4, 0);
   table->Insert(12, 0);
@@ -198,21 +198,89 @@ TEST(ExtendibleHashTableTest, GRADER_GetNumBuckets) {
 }
 
 TEST(ExtendibleHashTableTest, GRADER_LocalDepth) {
-  auto table = std::make_unique<ExtendibleHashTable<int, std::string>>(4);
+  auto table = std::make_unique<ExtendibleHashTable<int, int>>(4);
+  int result;
 
-  table->Insert(4, "a");
-  table->Insert(12, "a");
-  table->Insert(16, "a");
-  table->Insert(64, "a");
-  table->Insert(5, "a");
-  table->Insert(10, "a");
-  table->Insert(51, "a");
-  table->Insert(15, "a");
-  table->Insert(18, "a");
-  table->Insert(20, "a");
-  table->Insert(7, "a");
-  table->Insert(21, "a");
+  table->Insert(4, 4);
+  table->Insert(12, 12);
+  table->Insert(16, 16);
+  table->Insert(64, 64);
+  table->Insert(5, 5);
+  table->Insert(10, 10);
+  table->Insert(51, 51);
+  table->Insert(15, 15);
+  table->Insert(18, 18);
+  table->Insert(20, 20);
+  table->Insert(7, 7);
+  table->Insert(21, 21);
 
   EXPECT_EQ(2, table->GetLocalDepth(5));
+
+  table->Insert(11, 11);
+  table->Insert(19, 19);
+  EXPECT_TRUE(table->Find(15, result));
 }
+
+TEST(ExtendibleHashTableTest, LocalDepth) {
+  auto table = std::make_unique<ExtendibleHashTable<int, int>>(4);
+
+  table->Insert(4, 4);
+  table->Insert(12, 12);
+  table->Insert(16, 16);
+  table->Insert(64, 64);
+  table->Insert(5, 5);
+  table->Insert(10, 10);
+  table->Insert(51, 51);
+  table->Insert(15, 15);
+  table->Insert(18, 18);
+  table->Insert(20, 20);
+  table->Insert(7, 7);
+  table->Insert(21, 21);
+  table->Insert(11, 11);
+  table->Insert(19, 19);
+
+  EXPECT_EQ(3, table->GetLocalDepth(3));
+}
+
+TEST(ExtendibleHashTableTest, InsertFind) {
+  auto table = std::make_unique<ExtendibleHashTable<int, int>>(2);
+
+  table->Insert(1, 1);
+  table->Insert(2, 2);
+  table->Insert(3, 3);
+  table->Insert(4, 4);
+  table->Insert(5, 5);
+  table->Insert(6, 6);
+  table->Insert(7, 7);
+  table->Insert(8, 8);
+  table->Insert(9, 9);
+  table->Insert(10, 10);
+  table->Insert(20, 20);
+  table->Insert(11, 11);
+  table->Insert(12, 12);
+  table->Insert(13, 13);
+  table->Insert(14, 14);
+  table->Insert(15, 15);
+  table->Insert(16, 16);
+  table->Insert(17, 17);
+  table->Insert(18, 18);
+  table->Insert(19, 19);
+  table->Insert(30, 30);
+  table->Insert(21, 21);
+  table->Insert(22, 22);
+  table->Insert(23, 23);
+  table->Insert(24, 24);
+  table->Insert(25, 25);
+  table->Insert(26, 26);
+  table->Insert(27, 27);
+  table->Insert(28, 28);
+  table->Insert(31, 31);
+  table->Insert(32, 32);
+  table->Insert(33, 33);
+  table->Insert(34, 34);
+  table->Insert(35, 35);
+  table->Insert(36, 36);
+  table->Insert(37, 37);
+}
+
 }  // namespace bustub

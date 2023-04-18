@@ -22,6 +22,7 @@
 #include <memory>
 #include <mutex>  // NOLINT
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #include "container/hash/hash_table.h"
@@ -107,6 +108,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
   auto Remove(const K &key) -> bool override;
 
   auto PrintDir() -> void {
+    std::cout << "PrintDir:" << std::endl;
     std::cout << "dir_ global depth: " << global_depth_ << std::endl;
     for (size_t i = 0; i < dir_.size(); i++) {
       std::cout << i << " local depth(" << dir_[i]->GetDepth() << ")"
@@ -198,7 +200,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
    * @brief Redistribute the kv pairs in a full bucket.
    * @param bucket The bucket to be redistributed.
    */
-  auto RedistributeBucket(std::shared_ptr<Bucket> bucket) -> void;
+  void RedistributeBucket(std::shared_ptr<Bucket> old_bucket, std::shared_ptr<Bucket> new_bucket, size_t origin_idx);
 
   /*****************************************************************
    * Must acquire latch_ first before calling the below functions. *
