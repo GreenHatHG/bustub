@@ -158,7 +158,7 @@ TEST(ExtendibleHashTableTest, ConcurrentInsertTest2) {
   }
 }
 
-TEST(ExtendibleHashTableTest, DISABLED_GetNumBuckets) {
+TEST(ExtendibleHashTableTest, GetNumBuckets) {
   auto table = std::make_unique<ExtendibleHashTable<int, int>>(2);
   table->Insert(4, 0);
   table->Insert(12, 0);
@@ -178,7 +178,7 @@ TEST(ExtendibleHashTableTest, DISABLED_GetNumBuckets) {
   table->Insert(19, 0);
 }
 
-TEST(ExtendibleHashTableTest, GRADER_GetNumBuckets) {
+TEST(ExtendibleHashTableTest, GetNumBuckets2) {
   auto table = std::make_unique<ExtendibleHashTable<int, std::string>>(4);
 
   table->Insert(4, "a");

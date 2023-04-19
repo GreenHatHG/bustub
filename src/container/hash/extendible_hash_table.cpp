@@ -32,11 +32,6 @@ auto ClearLeftMostBit(int num) -> int {
   return num & ~(1 << (sizeof(num) * 8 - __builtin_clz(num) - 1));
 }
 
-auto SetBit(const int num, const int n) -> int {
-  int mask = 1 << (n - 1);  // 生成掩码，将第n位设为1
-  return num | mask;        // 使用按位或运算将num的第n位设为1
-}
-
 namespace bustub {
 
 template <typename K, typename V>
@@ -50,8 +45,7 @@ ExtendibleHashTable<K, V>::ExtendibleHashTable(size_t bucket_size)
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::IndexOf(const K &key) -> size_t {
   int mask = (1 << global_depth_) - 1;
-  const auto key_hash = std::hash<K>()(key);
-  return key_hash & mask;
+  return std::hash<K>()(key) & mask;
 }
 
 template <typename K, typename V>
@@ -120,15 +114,28 @@ auto operator<<(std::ostream &os, const std::list<int>::iterator &it) -> std::os
 }
 
 template <typename K, typename V>
-auto ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> old_bucket,
-                                                   std::shared_ptr<Bucket> new_bucket, size_t origin_idx) -> void {
-  for (auto it = old_bucket->GetItems().begin(); it != old_bucket->GetItems().end();) {
-    auto idx = IndexOf(it->first);
-    if(idx != origin_idx){
+auto ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucket) -> void {
+  bucket->IncrementDepth();
+  num_buckets_++;
+  const int depth = bucket->GetDepth();
+  auto new_bucket = std::make_shared<Bucket>(bucket_size_, depth);
+  const size_t old_mask = (1 << (depth - 1)) - 1;
+  const size_t now_mask = (1 << depth) - 1;
+  const size_t old_idx = std::hash<K>()(bucket->GetItems().begin()->first) & old_mask;
+
+  for (auto it = bucket->GetItems().begin(); it != bucket->GetItems().end();) {
+    size_t idx = std::hash<K>()(it->first) & now_mask;
+    if (idx != old_idx) {
       new_bucket->Insert(it->first, it->second);
-      it = old_bucket->GetItems().erase(it);
-    }else{
+      it = bucket->GetItems().erase(it);
+    } else {
       it++;
+    }
+  }
+
+  for (size_t i = 0; i < dir_.size(); i++) {
+    if ((i & old_mask) == old_idx && (i & now_mask) != old_idx) {
+      dir_[i] = new_bucket;
     }
   }
 }
@@ -140,52 +147,24 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
             << "key: " << key << " ,value:" << value << std::endl;
   auto [key_bucket, key_dir_index] = FindBucket(key);
 
-  while (key_bucket->IsFull()) {
+  while (!key_bucket->Insert(key, value)) {
     std::cout << "key_bucket is full" << std::endl;
+    std::cout << "global_depth: " << global_depth_ << "local depth: " << key_bucket->GetDepth() << std::endl;
 
-    num_buckets_++;
-    std::shared_ptr<Bucket> new_bucket;
     if (global_depth_ == key_bucket->GetDepth()) {
-      std::cout << "global_depth: " << global_depth_ << " = "
-                << "local depth: " << key_bucket->GetDepth() << std::endl;
-
       global_depth_++;
       dir_.resize(dir_.size() * 2);
       for (size_t i = dir_.size() / 2, j = 0; i < dir_.size(); i++, j++) {
         dir_[i] = dir_[j];
       }
-
-      // second entry to point to the new bucket
-      const int set_bit = SetBit(key_dir_index, global_depth_);
-      new_bucket = std::make_shared<Bucket>(Bucket(bucket_size_, global_depth_));
-      dir_[set_bit] = new_bucket;
-      dir_[key_dir_index]->IncrementDepth();
-    } else {
-      std::cout << "global_depth: " << global_depth_ << " > "
-                << "local depth: " << key_bucket->GetDepth() << std::endl;
-      key_bucket->IncrementDepth();
-      new_bucket = std::make_shared<Bucket>(Bucket(bucket_size_, key_bucket->GetDepth()));
-
-      std::vector<int> same_index;
-      for (size_t i = 0; i < dir_.size(); i++) {
-        if (i != key_dir_index && dir_[i] == key_bucket) {
-          same_index.push_back(i);
-        }
-      }
-      int same_index_size = same_index.size();
-      for (int i = same_index_size / 2; i < same_index_size; i++) {
-        dir_[same_index[i]] = new_bucket;
-      }
     }
     std::cout << "before RedistributeBucket" << std::endl;
     PrintDir();
-    RedistributeBucket(dir_[key_dir_index], new_bucket, key_dir_index);
+    RedistributeBucket(dir_[key_dir_index]);
     std::cout << "after RedistributeBucket" << std::endl;
     PrintDir();
     std::tie(key_bucket, key_dir_index) = FindBucket(key);
   }
-  auto is_inserted = key_bucket->Insert(key, value);
-  std::cout << "isInserted: " << is_inserted << std::endl;
   PrintDir();
 }
 
@@ -232,7 +211,7 @@ auto ExtendibleHashTable<K, V>::Bucket::Insert(const K &key, const V &value) -> 
   // 找到了具有特定key的元素，更新其value值
   if (it != list_.end()) {
     it->second = value;
-  }else{
+  } else {
     // 未找到具有特定key的元素，插入新元素到std::list的末尾
     list_.emplace_back(key, value);
   }
