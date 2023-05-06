@@ -115,17 +115,26 @@ auto operator<<(std::ostream &os, const std::list<int>::iterator &it) -> std::os
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucket) -> void {
-  bucket->IncrementDepth();
-  num_buckets_++;
-  const int depth = bucket->GetDepth();
-  auto new_bucket = std::make_shared<Bucket>(bucket_size_, depth);
-  const size_t old_mask = (1 << (depth - 1)) - 1;
-  const size_t now_mask = (1 << depth) - 1;
-  const size_t old_idx = std::hash<K>()(bucket->GetItems().begin()->first) & old_mask;
+  const int bucket_old_depth = bucket->GetDepth();
+  const size_t bucket_old_mask = (1 << bucket_old_depth) - 1;
+  const size_t bucket_old_last_depth_bits = std::hash<K>()(bucket->GetItems().begin()->first) & bucket_old_mask;
 
+  if (global_depth_ == bucket->GetDepth()) {
+    global_depth_++;
+    const size_t dir_size = dir_.size();
+    for (size_t i = 0; i < dir_size; i++) {
+      dir_.emplace_back(dir_[i]);
+    }
+  }
+
+  bucket->IncrementDepth();
+  auto new_bucket = std::make_shared<Bucket>(bucket_size_, bucket->GetDepth());
+  num_buckets_++;
+
+  int check_bit_set_mask = 1 << (bucket->GetDepth() - 1);
   for (auto it = bucket->GetItems().begin(); it != bucket->GetItems().end();) {
-    size_t idx = std::hash<K>()(it->first) & now_mask;
-    if (idx != old_idx) {
+    bool is_bit_set = (std::hash<K>()(it->first) & check_bit_set_mask) != 0;
+    if (is_bit_set) {
       new_bucket->Insert(it->first, it->second);
       it = bucket->GetItems().erase(it);
     } else {
@@ -134,7 +143,9 @@ auto ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucke
   }
 
   for (size_t i = 0; i < dir_.size(); i++) {
-    if ((i & old_mask) == old_idx && (i & now_mask) != old_idx) {
+    bool is_prev_full_bucket_ptr = (i & bucket_old_mask) == bucket_old_last_depth_bits;
+    bool is_bit_set = (i & check_bit_set_mask) != 0;
+    if (is_prev_full_bucket_ptr && is_bit_set) {
       dir_[i] = new_bucket;
     }
   }
@@ -150,14 +161,6 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   while (!key_bucket->Insert(key, value)) {
     std::cout << "key_bucket is full" << std::endl;
     std::cout << "global_depth: " << global_depth_ << "local depth: " << key_bucket->GetDepth() << std::endl;
-
-    if (global_depth_ == key_bucket->GetDepth()) {
-      global_depth_++;
-      dir_.resize(dir_.size() * 2);
-      for (size_t i = dir_.size() / 2, j = 0; i < dir_.size(); i++, j++) {
-        dir_[i] = dir_[j];
-      }
-    }
     std::cout << "before RedistributeBucket" << std::endl;
     PrintDir();
     RedistributeBucket(dir_[key_dir_index]);
