@@ -135,11 +135,28 @@ class LRUKReplacer {
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.
-  [[maybe_unused]] size_t current_timestamp_{0};
-  [[maybe_unused]] size_t curr_size_{0};
-  [[maybe_unused]] size_t replacer_size_;
-  [[maybe_unused]] size_t k_;
+  size_t current_timestamp_{0};
+  size_t curr_size_{0};
+  [[maybe_unused]] size_t replacer_size_{0};
+  size_t k_;
   std::mutex latch_;
+
+  struct LruEntry{
+    bool evictable_{false};
+    size_t access_count_{0};
+  };
+  std::unordered_map<frame_id_t, LruEntry> lru_entry_hash_;
+
+  
+  struct PairHash {
+    auto operator()(const std::pair<frame_id_t , size_t>& p) const -> std::size_t {
+      // 使用 std::hash 计算哈希值
+      std::size_t h1 = std::hash<frame_id_t>{}(p.first);
+      std::size_t h2 = std::hash<size_t>{}(p.second);
+      return h1 ^ (h2 << 1); // 可以使用异或和位移等运算来组合哈希值
+    }
+  };
+  std::unordered_map<std::pair<frame_id_t, size_t>, size_t, PairHash> hist_;
 };
 
 }  // namespace bustub
