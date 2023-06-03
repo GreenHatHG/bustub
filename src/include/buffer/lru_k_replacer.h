@@ -170,7 +170,6 @@ class LRUKReplacer {
   std::list<frame_id_t> less_than_k_frames_;
   std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> frame_iterator_map_;
 
-  std::vector<frame_id_t> more_than_k_frames_;
 
   struct PairHash {
     auto operator()(const std::pair<frame_id_t, size_t> &p) const -> std::size_t {
@@ -181,6 +180,21 @@ class LRUKReplacer {
     }
   };
   std::unordered_map<std::pair<frame_id_t, size_t>, size_t, PairHash> hist_;
+
+//  struct AccessTimeCompare {
+//    explicit AccessTimeCompare(LRUKReplacer& replacer) : replacer_(replacer) {}
+//    auto GetLastKAccessTime(const frame_id_t x) const -> size_t {
+//      const auto last_k = replacer_.lru_entry_hash_.at(x).access_count_ - replacer_.k_ + 1;
+//      return replacer_.hist_.at(std::make_pair(x, last_k));
+//    }
+//    auto operator()(const frame_id_t a, const frame_id_t b) const -> bool {
+//      return GetLastKAccessTime(a) < GetLastKAccessTime(b);
+//    }
+//    const LRUKReplacer& replacer_;
+//  };
+//  std::set<frame_id_t, AccessTimeCompare> more_than_k_frames_{AccessTimeCompare(*this)};
+  std::vector<frame_id_t> more_than_k_frames_;
+
 };
 
 }  // namespace bustub
