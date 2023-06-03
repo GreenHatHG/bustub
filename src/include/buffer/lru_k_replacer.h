@@ -12,10 +12,12 @@
 
 #pragma once
 
+#include <iostream>
 #include <limits>
 #include <list>
 #include <mutex>  // NOLINT
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/config.h"
@@ -132,6 +134,24 @@ class LRUKReplacer {
    */
   auto Size() -> size_t;
 
+  void PrintDebug() {
+    std::cout << "front<--------------->back" << std::endl;
+    std::cout << "less_than_k_frames_: ";
+    for (int &it : less_than_k_frames_) {
+      std::cout << it << " ";
+    }
+    std::cout << std::endl << "more_than_k_frames_: ";
+    for (int &it : more_than_k_frames_) {
+      std::cout << it << " ";
+    }
+    std::cout << std::endl;
+  }
+
+  auto GetLastKAccessTime(const frame_id_t x) const -> size_t {
+    const auto last_k = lru_entry_hash_.at(x).access_count_ - k_ + 1;
+    return hist_.at(std::make_pair(x, last_k));
+  }
+
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.
@@ -141,19 +161,23 @@ class LRUKReplacer {
   size_t k_;
   std::mutex latch_;
 
-  struct LruEntry{
+  struct LruEntry {
     bool evictable_{false};
     size_t access_count_{0};
   };
   std::unordered_map<frame_id_t, LruEntry> lru_entry_hash_;
 
-  
+  std::list<frame_id_t> less_than_k_frames_;
+  std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> frame_iterator_map_;
+
+  std::vector<frame_id_t> more_than_k_frames_;
+
   struct PairHash {
-    auto operator()(const std::pair<frame_id_t , size_t>& p) const -> std::size_t {
+    auto operator()(const std::pair<frame_id_t, size_t> &p) const -> std::size_t {
       // 使用 std::hash 计算哈希值
       std::size_t h1 = std::hash<frame_id_t>{}(p.first);
       std::size_t h2 = std::hash<size_t>{}(p.second);
-      return h1 ^ (h2 << 1); // 可以使用异或和位移等运算来组合哈希值
+      return h1 ^ (h2 << 1);  // 可以使用异或和位移等运算来组合哈希值
     }
   };
   std::unordered_map<std::pair<frame_id_t, size_t>, size_t, PairHash> hist_;

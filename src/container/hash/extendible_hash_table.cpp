@@ -160,7 +160,7 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
 
   while (!key_bucket->Insert(key, value)) {
     std::cout << "key_bucket is full" << std::endl;
-    std::cout << "global_depth: " << global_depth_ << "local depth: " << key_bucket->GetDepth() << std::endl;
+    std::cout << "global_depth: " << global_depth_ << " local depth: " << key_bucket->GetDepth() << std::endl;
     std::cout << "before RedistributeBucket" << std::endl;
     PrintDir();
     RedistributeBucket(dir_[key_dir_index]);
@@ -168,6 +168,7 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
     PrintDir();
     std::tie(key_bucket, key_dir_index) = FindBucket(key);
   }
+  std::cout << "insert success" << std::endl;
   PrintDir();
 }
 
