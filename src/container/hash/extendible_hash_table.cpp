@@ -84,7 +84,7 @@ auto ExtendibleHashTable<K, V>::GetNumBucketsInternal() const -> int {
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::FindBucket(const K &key) -> std::tuple<std::shared_ptr<Bucket>, size_t> {
   auto dir_index = IndexOf(key);
-  std::cout << "[FindBucket] key:" << key << ", dir_index:" << dir_index << std::endl;
+  //  std::cout << "[FindBucket] key:" << key << ", dir_index:" << dir_index << std::endl;
   std::shared_ptr<Bucket> bucket = dir_[dir_index];
   return std::make_tuple(bucket, dir_index);
 }
@@ -154,22 +154,22 @@ auto ExtendibleHashTable<K, V>::RedistributeBucket(std::shared_ptr<Bucket> bucke
 template <typename K, typename V>
 void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
   std::scoped_lock<std::mutex> lock(latch_);
-  std::cout << "===========[Insert]"
-            << "key: " << key << " ,value:" << value << std::endl;
+  //  std::cout << "===========[Insert]"
+  //            << "key: " << key << " ,value:" << value << std::endl;
   auto [key_bucket, key_dir_index] = FindBucket(key);
 
   while (!key_bucket->Insert(key, value)) {
-    std::cout << "key_bucket is full" << std::endl;
-    std::cout << "global_depth: " << global_depth_ << " local depth: " << key_bucket->GetDepth() << std::endl;
-    std::cout << "before RedistributeBucket" << std::endl;
-    PrintDir();
+    //    std::cout << "key_bucket is full" << std::endl;
+    //    std::cout << "global_depth: " << global_depth_ << " local depth: " << key_bucket->GetDepth() << std::endl;
+    //    std::cout << "before RedistributeBucket" << std::endl;
+    //    PrintDir();
     RedistributeBucket(dir_[key_dir_index]);
-    std::cout << "after RedistributeBucket" << std::endl;
-    PrintDir();
+    //    std::cout << "after RedistributeBucket" << std::endl;
+    //    PrintDir();
     std::tie(key_bucket, key_dir_index) = FindBucket(key);
   }
-  std::cout << "insert success" << std::endl;
-  PrintDir();
+  //  std::cout << "insert success" << std::endl;
+  //  PrintDir();
 }
 
 //===--------------------------------------------------------------------===//

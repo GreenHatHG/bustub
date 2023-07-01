@@ -25,14 +25,14 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
     auto entry = lru_entry_hash_[*it];
     if (entry.evictable_) {
       *frame_id = *it;
-      std::cout << "LRUKReplacer::Evict frame id: " << *frame_id << std::endl;
+      //      std::cout << "LRUKReplacer::Evict frame id: " << *frame_id << std::endl;
 
       lru_entry_hash_.erase(*it);
       frame_iterator_map_.erase(*it);
       less_than_k_frames_.erase(it);
 
       curr_size_--;
-      PrintDebug();
+      //      PrintDebug();
       return true;
     }
   }
@@ -44,13 +44,13 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
     auto entry = lru_entry_hash_[*it];
     if (entry.evictable_) {
       *frame_id = *it;
-      std::cout << "LRUKReplacer::Evict frame id: " << *frame_id << std::endl;
+      //      std::cout << "LRUKReplacer::Evict frame id: " << *frame_id << std::endl;
 
       lru_entry_hash_.erase(*it);
       more_than_k_frames_.erase(it);
 
       curr_size_--;
-      PrintDebug();
+      //      PrintDebug();
       return true;
     }
   }
@@ -61,8 +61,8 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
 void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   std::scoped_lock<std::mutex> lock(latch_);
 
-  std::cout << "[LRUKReplacer::RecordAccess] "
-            << "frame id: " << frame_id << std::endl;
+  //  std::cout << "[LRUKReplacer::RecordAccess] "
+  //            << "frame id: " << frame_id << std::endl;
   current_timestamp_++;
 
   LruEntry entry;
@@ -84,7 +84,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
   }
 
   lru_entry_hash_[frame_id] = entry;
-  PrintDebug();
+  //  PrintDebug();
 }
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
