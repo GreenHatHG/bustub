@@ -140,6 +140,45 @@ class BufferPoolManagerInstance : public BufferPoolManager {
    */
   auto DeletePgImp(page_id_t page_id) -> bool override;
 
+  auto GetVictimPage(frame_id_t *frame_id, page_id_t page_id) -> Page * {
+    std::cout << "[BPM:NewPageFromFreeListOrReplacer] free_list size:" << free_list_.size()
+              << ", replacer size:" << replacer_->Size() << std::endl;
+
+    if (free_list_.empty() && replacer_->Size() == 0) {
+      return nullptr;
+    }
+
+    if (!free_list_.empty()) {
+      *frame_id = free_list_.front();
+      free_list_.pop_front();
+    } else {
+      replacer_->Evict(frame_id);
+    }
+
+    Page *page = &pages_[*frame_id];
+    std::cout << "[BPM:NewPageFromFreeListOrReplacer] page table remove page id: " << page->GetPageId() << std::endl;
+    page_table_->Remove(page->GetPageId());
+
+    if (page->IsDirty()) {
+      disk_manager_->WritePage(page->GetPageId(), page->GetData());
+      page->is_dirty_ = false;
+      page->ResetMemory();
+    }
+
+    page->pin_count_ = 1;
+
+    if (page_id == INVALID_PAGE_ID) {
+      page_id = AllocatePage();
+      std::cout << "[BPM:NewPageFromFreeListOrReplacer] allocate page id: " << page_id << std::endl;
+    }
+    page->page_id_ = page_id;
+
+    page_table_->Insert(page_id, *frame_id);
+    replacer_->SetEvictable(*frame_id, false);
+    replacer_->RecordAccess(*frame_id);
+    return page;
+  }
+
   /** Number of pages in the buffer pool. */
   const size_t pool_size_;
   /** The next page id to be allocated  */
