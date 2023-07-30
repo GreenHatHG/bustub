@@ -44,6 +44,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
 
  private:
   // Flexible array member for page data.
-  MappingType array_[1];
+  // https://stackoverflow.com/questions/6390331/why-use-array-size-1-instead-of-pointer
+    MappingType array_[1];
 };
 }  // namespace bustub

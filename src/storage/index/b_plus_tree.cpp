@@ -35,6 +35,36 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
   return false;
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::Find(const KeyType &key) -> BPlusTreePage* {
+  auto node = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(GetRootPageId())->GetData());
+  while(!node->IsLeafPage()){
+    int smallest_number = -1;
+    for(int i = 0; i < node->GetSize(); i++){
+      if(key <= node->ValueAt(i)){
+        smallest_number = i;
+      }
+    }
+
+    if(smallest_number == -1){
+      node = node->KeyAt(node->GetSize()-1);
+    }
+    else if(key == node->ValueAt(smallest_number)){
+      node = node->KeyAt(smallest_number+1);
+    }
+    else{
+      node = node->KeyAt(smallest_number);
+    }
+  }
+
+  for(size_t i = 0; i < node->GetSize(); i++){
+    if(node->ValueAt(i) == key){
+      return node->KeyAt(i);
+    }
+  }
+  return nullptr;
+}
+
 /*****************************************************************************
  * INSERTION
  *****************************************************************************/
@@ -47,7 +77,12 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) -> bool {
-  return false;
+  page_id_t new_page_id;
+  if(GetRootPageId() == INVALID_PAGE_ID){
+    auto page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->NewPage(&new_page_id));
+    page->SetKeyAt(0, key);
+
+  }
 }
 
 /*****************************************************************************
@@ -94,7 +129,16 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE { return INDEXITERATOR_TYPE(); 
  * @return Page id of the root of this tree
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t { return 0; }
+auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t {
+  auto *header_page = static_cast<HeaderPage *>(buffer_pool_manager_->FetchPage(HEADER_PAGE_ID));
+  page_id_t root_id;
+  auto ok = header_page->GetRootId(index_name_, &root_id);
+  buffer_pool_manager_->UnpinPage(HEADER_PAGE_ID, false);
+  if(!ok){
+    return INVALID_PAGE_ID;
+  }
+  return root_id;
+}
 
 /*****************************************************************************
  * UTILITIES AND DEBUG
