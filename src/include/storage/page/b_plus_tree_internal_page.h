@@ -41,6 +41,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   auto KeyAt(int index) const -> KeyType;
   void SetKeyAt(int index, const KeyType &key);
   auto ValueAt(int index) const -> ValueType;
+  void SetIndex(const size_t idx, const std::pair<KeyType, ValueType> &m);
 
  private:
   // Flexible array member for page data.
