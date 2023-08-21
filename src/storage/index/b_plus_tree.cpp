@@ -74,73 +74,83 @@ auto BPLUSTREE_TYPE::ReachLeafNode(const KeyType &key) -> LeafPage * {
  * @return: since we only support unique key, if user try to insert duplicate
  * keys return false, otherwise return true.
  */
+
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) -> bool {
-  page_id_t new_page_id;
   if(root_page_id_ == INVALID_PAGE_ID){
-    auto page = reinterpret_cast<LeafPage *>(buffer_pool_manager_->NewPage(&new_page_id));
-    page->Init(new_page_id, INVALID_PAGE_ID, leaf_max_size_);
+    page_id_t new_root_id{INVALID_PAGE_ID};
+    auto page = reinterpret_cast<LeafPage *>(buffer_pool_manager_->NewPage(&new_root_id));
+    page->Init(new_root_id, INVALID_PAGE_ID, leaf_max_size_);
     page->SetIndex(0, MappingType{key, value});
-    page->SetPageType(IndexPageType::LEAF_PAGE);
     page->IncreaseSize(1);
-    root_page_id_ = new_page_id;
+    root_page_id_ = new_root_id;
     UpdateRootPageId(1);
-    buffer_pool_manager_->UnpinPage(new_page_id, true);
+    buffer_pool_manager_->UnpinPage(new_root_id, true);
     return true;
   }
 
-  LeafPage *leaf_node = ReachLeafNode(key);
+  LeafPage *current = ReachLeafNode(key);
 
   int be_inserted_idx = 0;
-  while(comparator_(key, leaf_node->KeyAt(be_inserted_idx)) == 1 && be_inserted_idx < leaf_node->GetMaxSize()){
+  while(comparator_(key, current->KeyAt(be_inserted_idx)) == 1 && be_inserted_idx < current->GetMaxSize() - 1){
     be_inserted_idx++;
   }
 
-  if(leaf_node->GetSize() < leaf_node->GetMaxSize()){
-    leaf_node->ShiftElementsForward(leaf_node->GetSize(), be_inserted_idx);
-    leaf_node->SetIndex(be_inserted_idx, MappingType{key, value});
-    leaf_node->IncreaseSize(1);
+  if(current->GetSize() < current->GetMaxSize() - 1){
+    current->ShiftElementsForward(current->GetSize(), be_inserted_idx);
+    current->SetIndex(be_inserted_idx, MappingType{key, value});
+    current->IncreaseSize(1);
     return true;
   }
 
   // if block does not have enough space;
-  auto new_leaf = reinterpret_cast<LeafPage *>(buffer_pool_manager_->NewPage(&new_page_id));
-  new_leaf->Init(new_page_id, INVALID_PAGE_ID, leaf_max_size_);
-  new_leaf->SetPageType(IndexPageType::LEAF_PAGE);
-  MappingType temp_node[leaf_max_size_ + 1];
+  page_id_t new_leaf_id{INVALID_PAGE_ID};
+  auto new_leaf = reinterpret_cast<LeafPage *>(buffer_pool_manager_->NewPage(&new_leaf_id));
+  new_leaf->Init(new_leaf_id, INVALID_PAGE_ID, leaf_max_size_);
+  // todo: buffer pool
+  MappingType temp_node[leaf_max_size_];
 
-  for(int i = 0; i < leaf_max_size_; i++){
-    temp_node[i] = leaf_node->IndexAt(i);
+  for(int i = 0; i < leaf_max_size_ - 1; i++){
+    temp_node[i] = current->IndexAt(i);
   }
-  for(int i = leaf_max_size_ + 1; i > be_inserted_idx; i++){
+  for(int i = leaf_max_size_ - 1; i > be_inserted_idx; i++){
     temp_node[i] = temp_node[i-1];
   }
-  temp_node[be_inserted_idx] = leaf_node->IndexAt(be_inserted_idx);
+  temp_node[be_inserted_idx] = MappingType{key, value};
 
-  size_t mid = (leaf_node->GetSize() + 1)/2;
-  leaf_node->SetSize(mid);
-  new_leaf->SetSize((leaf_node->GetSize() + 1) - mid);
+  size_t mid = (current->GetSize() + 1)/2;
+  current->SetSize(mid);
+  new_leaf->SetSize((current->GetSize() + 1) - mid);
 
-  for(int i = 0; i < leaf_node->GetSize(); i++){
-    leaf_node->SetIndex(i, temp_node[i]);
+  for(int i = 0; i < current->GetSize(); i++){
+    current->SetIndex(i, temp_node[i]);
   }
-  for(int i = 0, j = leaf_node->GetSize(); i < new_leaf->GetSize(); i++, j++){
+  for(int i = 0, j = current->GetSize(); i < new_leaf->GetSize(); i++, j++){
     new_leaf->SetIndex(i, temp_node[j]);
   }
-  new_leaf->SetNextPageId(leaf_node->GetPageId());
+  current->SetNextPageId(new_leaf->GetPageId());
 
-  if(leaf_node->GetPageId() == root_page_id_){
-    auto new_root = reinterpret_cast<InternalPage *>(buffer_pool_manager_->NewPage(&new_page_id));
-    new_root->Init(new_page_id, INVALID_PAGE_ID, internal_max_size_);
-    new_root->SetPageType(IndexPageType::INTERNAL_PAGE);
-    new_root->SetIndex(0, MappingType{new_leaf->KeyAt(0), leaf_node->ValueAt(0)});
-    new_root->SetIndex(1, MappingType{, new_leaf->ValueAt(0)});
-    return true;
+  if(current->GetPageId() == root_page_id_){
+    page_id_t new_root_id{INVALID_PAGE_ID};
+    auto* new_root = reinterpret_cast<InternalPage *>(buffer_pool_manager_->NewPage(&new_root_id));
+    new_root->Init(new_root_id, INVALID_PAGE_ID, internal_max_size_);
+    new_root->IncreaseSize(1);
+    root_page_id_ = new_root_id;
+    UpdateRootPageId(0);
+    new_root->SetIndex(0, std::pair<KeyType, page_id_t>{KeyType{}, current->GetPageId()});
+    new_root->SetIndex(1, std::pair<KeyType, page_id_t>{new_leaf->KeyAt(0), new_leaf->GetPageId()});
+    buffer_pool_manager_->UnpinPage(new_root_id, true);
+  }else{
+
   }
-  buffer_pool_manager_->UnpinPage(new_page_id, true);
+  buffer_pool_manager_->UnpinPage(new_leaf_id, true);
   return true;
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::ShiftLevel() -> void{
+
+}
 /*****************************************************************************
  * REMOVE
  *****************************************************************************/

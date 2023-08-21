@@ -89,7 +89,7 @@ class BPlusTree {
   KeyComparator comparator_;
   int leaf_max_size_;
   int internal_max_size_;
-  LeafPage *ReachLeafNode(const KeyType &key);
+  auto ReachLeafNode(const KeyType &key) -> LeafPage *;
 };
 
 }  // namespace bustub
