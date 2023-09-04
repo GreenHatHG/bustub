@@ -50,7 +50,6 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
   void ShiftElementsForward(size_t pos1, size_t pos2);
-  void SwapElement(size_t idx1, const size_t idx2);
   auto ValueAt(int index) const -> ValueType;
   auto IndexAt(int index) const -> std::pair<KeyType, ValueType>;
   void SetIndex(const size_t idx, const std::pair<KeyType, ValueType> &m);

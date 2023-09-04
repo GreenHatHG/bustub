@@ -78,11 +78,6 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::SetIndex(const size_t idx, const MappingType& m
   array_[idx] = m;
 }
 
-INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::SwapElement(const size_t idx1, const size_t idx2){
-  std::swap(array_[idx1], array_[idx2]);
-}
-
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;
 template class BPlusTreeLeafPage<GenericKey<8>, RID, GenericComparator<8>>;
 template class BPlusTreeLeafPage<GenericKey<16>, RID, GenericComparator<16>>;
