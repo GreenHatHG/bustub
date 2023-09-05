@@ -74,6 +74,24 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::ShiftElementsForward(const size_t pos1, const s
 }
 
 INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::ExistsKey(const KeyType &key, const KeyComparator &comparator) -> bool{
+  int left = 0;
+  int right = GetSize() - 1;
+  while (left <= right) {
+    int mid = left + (right - left) / 2;
+    if (comparator(array_[mid].first, key) == 0) {
+      return true;
+    }
+    if (comparator(array_[mid].first, key) < 0) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+  return false;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::SetIndex(const size_t idx, const MappingType& m) {
   array_[idx] = m;
 }

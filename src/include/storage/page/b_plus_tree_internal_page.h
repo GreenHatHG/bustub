@@ -44,6 +44,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   void SetIndex(const size_t idx, const std::pair<KeyType, ValueType> &m);
   void ShiftElementsForward(const size_t pos1, const size_t pos2);
   std::pair<KeyType, ValueType> IndexAt(int index) const;
+  ValueType FindSmallestNumber(const KeyType &key, const KeyComparator &comparator);
 
  private:
   // Flexible array member for page data.

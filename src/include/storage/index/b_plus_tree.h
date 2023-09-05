@@ -98,6 +98,7 @@ class BPlusTree {
   template <typename NodeType, typename ArrayType>
   void InsertAfter(ArrayType m, NodeType *node);
   void InsertInParent(LeafPage *n, const KeyType &k_new, LeafPage *n_new);
+  void NewRoot(const KeyType &key, const ValueType &value);
 };
 
 }  // namespace bustub
