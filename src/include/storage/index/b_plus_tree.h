@@ -97,8 +97,10 @@ class BPlusTree {
   auto CopyToMemory(NodeType *node) -> NodeType *;
   template <typename NodeType, typename ArrayType>
   void InsertAfter(ArrayType m, NodeType *node);
-  void InsertInParent(LeafPage *n, const KeyType &k_new, LeafPage *n_new);
+  void InsertInParent(BPlusTreePage *n, const KeyType &k_new, BPlusTreePage *n_new);
   void NewRoot(const KeyType &key, const ValueType &value);
+  template <typename NodeType>
+  int SplitNodes(NodeType &n, NodeType &n_new);
 };
 
 }  // namespace bustub
