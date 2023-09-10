@@ -49,11 +49,13 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto GetNextPageId() const -> page_id_t;
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
-  void ShiftElementsForward(size_t pos1, size_t pos2);
   auto ValueAt(int index) const -> ValueType;
   auto IndexAt(int index) const -> std::pair<KeyType, ValueType>;
   void SetIndex(size_t idx, const std::pair<KeyType, ValueType> &m);
-  bool ExistsKey(const KeyType &key, const KeyComparator &comparator);
+  auto ExistsKey(const KeyType &key, const KeyComparator &comparator) -> bool;
+  auto UpperBound(const KeyType &key, const KeyComparator &comparator) -> int;
+  void Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator);
+  void InsertAtBack(const KeyType &key, const ValueType &value);
 
  private:
   page_id_t next_page_id_;

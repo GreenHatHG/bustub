@@ -50,7 +50,8 @@ auto BPLUSTREE_TYPE::ReachLeafNode(const KeyType &key) -> LeafPage* {
 
   while(!current->IsLeafPage()){
     auto* internal_page = reinterpret_cast<InternalPage *>(current);
-    auto next_page_id = internal_page->FindSmallestNumber(key, comparator_);
+    int idx = internal_page->UpperBound(key, comparator_);
+    auto next_page_id = internal_page->ValueAt(idx);
     buffer_pool_manager_->UnpinPage(current->GetPageId(), false);
 
     page = buffer_pool_manager_->FetchPage(next_page_id);
@@ -95,86 +96,71 @@ auto BPLUSTREE_TYPE::CopyToMemory(NodeType* node) -> NodeType*{
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-template <typename NodeType, typename ArrayType>
-auto BPLUSTREE_TYPE::InsertAfter(ArrayType be_inserted, NodeType* node) -> void{
-  int be_inserted_idx = 0;
-  while(comparator_(be_inserted.first, node->KeyAt(be_inserted_idx)) == 1 && be_inserted_idx < node->GetMaxSize() - 1){
-    be_inserted_idx++;
-  }
-  node->ShiftElementsForward(node->GetSize(), be_inserted_idx);
-  node->SetIndex(be_inserted_idx, be_inserted);
-  node->IncreaseSize(1);
-}
-
-INDEX_TEMPLATE_ARGUMENTS
 template <typename NodeType>
-auto BPLUSTREE_TYPE::SplitNodes(NodeType &n, NodeType &n_new) -> int{
-  int mid = (n->GetSize() + 1)/2;
-  n->SetSize(mid);
-  for(int i = 0; i < n->GetSize(); i++){
+auto BPLUSTREE_TYPE::SplitNodes(NodeType &n, NodeType &n_new) -> void{
+  int mid = (n_new->GetSize() + 1)/2;
+  int n_size = mid;
+  int n_new_size = n_new->GetSize() - mid;
+
+  n->SetSize(n_size);
+  for(int i = 0; i < n_size; i++){
     n->SetIndex(i, n_new->IndexAt(i));
   }
 
-  n_new->SetSize((n->GetSize() + 1) - mid);
-  for(int i = 0, j = n->GetSize(); i < n_new->GetSize(); i++, j++){
+  n_new->SetSize(n_new_size);
+  int n_new_begin = 0;
+  if(std::is_same<NodeType, InternalPage>::value){
+    n_new_begin = 1;
+  }
+  for(int i = n_new_begin, j = n_size; i < n_new_size; i++, j++){
     n_new->SetIndex(i, n_new->IndexAt(j));
   }
-  return mid;
-}
-
-INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::InsertInLeaf(LeafPage* leaf, const KeyType &key, const ValueType &value) -> void{
-  int be_inserted_idx = 0;
-  while(comparator_(key, leaf->KeyAt(be_inserted_idx)) == 1 && be_inserted_idx < leaf->GetMaxSize() - 1){
-    be_inserted_idx++;
-  }
-
-  leaf->ShiftElementsForward(leaf->GetSize(), be_inserted_idx);
-  leaf->SetIndex(be_inserted_idx, MappingType{key, value});
-  leaf->IncreaseSize(1);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::InsertInParent(BPlusTreePage* n, const KeyType& k_new, BPlusTreePage* n_new) -> void{
   if(n->IsRootPage()){
-    auto* r = NewNode<InternalPage>();
-    r->IncreaseSize(2);
+    auto* root_new = NewNode<InternalPage>();
 
-    root_page_id_ = r->GetPageId();
+    root_page_id_ = root_new->GetPageId();
     UpdateRootPageId(0);
 
-    auto n_new_node = reinterpret_cast<LeafPage *>(n_new);
-    r->SetIndex(0, std::pair<KeyType, page_id_t>{KeyType{}, n->GetPageId()});
-    r->SetIndex(1, std::pair<KeyType, page_id_t>{n_new_node->KeyAt(0), n_new->GetPageId()});
+    root_new->InsertAtBack(KeyType{}, n->GetPageId());
+    root_new->InsertAtBack(k_new, n_new->GetPageId());
 
-    n->SetParentPageId(r->GetPageId());
-    n_new->SetParentPageId(r->GetPageId());
+    n->SetParentPageId(root_new->GetPageId());
+    n_new->SetParentPageId(root_new->GetPageId());
 
-    buffer_pool_manager_->UnpinPage(r->GetPageId(), true);
+    buffer_pool_manager_->UnpinPage(root_new->GetPageId(), true);
     return;
   }
 
   auto parent_id = n->GetParentPageId();
-  auto* p = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(parent_id)->GetData());
-  if(p->GetSize() < p->GetMaxSize()){
-    InsertAfter(std::pair<KeyType, page_id_t>{k_new, n_new->GetPageId()}, p);
+  auto* parent = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(parent_id)->GetData());
+  // 对于internal node，插入之前的size等于max_size需要拆分
+  // 所以这里插入前不拆分的极端情况是max_size-1
+  if(parent->GetSize() < parent->GetMaxSize()){
+    parent->Insert(k_new, n_new->GetPageId(), comparator_);
     n_new->SetParentPageId(parent_id);
-    buffer_pool_manager_->UnpinPage(parent_id, false);
+    buffer_pool_manager_->UnpinPage(parent_id, true);
     return;
   }
 
-  InternalPage * t = CopyToMemory(p);
-  InsertAfter(std::pair<KeyType, page_id_t>{k_new, n_new->GetPageId()}, t);
-  int mid = SplitNodes(p, t);
+  // 这里需要注意此时internal node size已经等于max size，不能插入了
+  InternalPage *t = CopyToMemory(parent);
+  t->Insert(k_new, n_new->GetPageId(), comparator_);
+  SplitNodes(parent, t);
+  n->SetParentPageId(t->GetPageId());
+  n_new->SetParentPageId(t->GetPageId());
   buffer_pool_manager_->UnpinPage(t->GetPageId(), true);
-  InsertInParent(p, t->KeyAt(mid), t);
+  buffer_pool_manager_->UnpinPage(parent->GetPageId(), true);
+  InsertInParent(parent, t->KeyAt(0), t);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::NewRoot(const KeyType &key, const ValueType &value) -> void{
-  auto r = NewNode<LeafPage>();
-  r->SetIndex(0, MappingType{key, value});
-  r->IncreaseSize(1);
+  auto* r = NewNode<LeafPage>();
+  r->InsertAtBack(key, value);
   root_page_id_ = r->GetPageId();
   UpdateRootPageId(1);
   buffer_pool_manager_->UnpinPage(r->GetPageId(), true);
@@ -193,23 +179,25 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
     return false;
   }
 
+  // leaf node拆分的条件是插入后size等于max_size，这里是插入成功但是不拆分，所以需要满足小于max_size-1
+  // 极端情况下等于max_size-1，插入后就需要拆分了
   if(leaf->GetSize() < leaf->GetMaxSize() - 1) {
-    InsertInLeaf(leaf, key, value);
+    leaf->Insert(key, value, comparator_);
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
     return true;
   }
 
-  // if block does not have enough space;
-  auto new_leaf = CopyToMemory(leaf);
-  InsertInLeaf(new_leaf, key, value);
+  // 这里leaf node大小已经是max_size-1，但是还能插入一个，所以直接申请一个page没问题
+  auto leaf_new = CopyToMemory(leaf);
+  leaf_new->Insert(key, value, comparator_);
 
-  new_leaf->SetNextPageId(leaf->GetNextPageId());
-  leaf->SetNextPageId(new_leaf->GetPageId());
+  SplitNodes(leaf, leaf_new);
+  leaf_new->SetNextPageId(leaf->GetNextPageId());
+  leaf->SetNextPageId(leaf_new->GetPageId());
 
-  SplitNodes(leaf, new_leaf);
-  InsertInParent(leaf, new_leaf->KeyAt(0), new_leaf);
+  InsertInParent(leaf, leaf_new->KeyAt(0), leaf_new);
   buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
-  buffer_pool_manager_->UnpinPage(new_leaf->GetPageId(), true);
+  buffer_pool_manager_->UnpinPage(leaf_new->GetPageId(), true);
   return true;
 }
 

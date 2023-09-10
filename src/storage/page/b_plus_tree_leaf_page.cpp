@@ -67,13 +67,6 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::IndexAt(int index) const -> MappingType {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::ShiftElementsForward(const size_t pos1, const size_t pos2){
-  for (size_t i = pos1; i > pos2; i--) {
-    array_[i] = array_[i - 1];
-  }
-}
-
-INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::ExistsKey(const KeyType &key, const KeyComparator &comparator) -> bool{
   int left = 0;
   int right = GetSize() - 1;
@@ -94,6 +87,29 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::ExistsKey(const KeyType &key, const KeyComparat
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::SetIndex(const size_t idx, const MappingType& m) {
   array_[idx] = m;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::UpperBound(const KeyType &key, const KeyComparator &comparator) -> int{
+  auto cmp = [&](const MappingType &element, const KeyType &val) -> bool { return comparator(element.first, val) < 0; };
+  return std::lower_bound(array_, array_ + GetSize(), key, cmp) - array_;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value,
+                                                    const KeyComparator &comparator) -> void{
+  int be_inserted_idx = UpperBound(key, comparator);
+  for (int i = GetSize(); i > be_inserted_idx; i--) {
+    array_[i] = array_[i - 1];
+  }
+  array_[be_inserted_idx] = {key, value};
+  IncreaseSize(1);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::InsertAtBack(const KeyType &key, const ValueType &value) -> void{
+  array_[GetSize()] = {key, value};
+  IncreaseSize(1);
 }
 
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;

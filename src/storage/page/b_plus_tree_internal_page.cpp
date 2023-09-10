@@ -65,27 +65,48 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetIndex(const size_t idx, const MappingTyp
     array_[idx] = m;
 }
 
+
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::FindSmallestNumber(const KeyType &key, const KeyComparator &comparator) -> ValueType{
-    auto size = GetSize();
-    for(int i = 0; i < size; i++){
-      /*comparator(a,b) = 0, if a = b
-        comparator(a,b) > 0, if a > b
-        comparator(a,b) < 0, if a < b
-       */
-      if(comparator(key, array_[i].first) == -1){
-        return array_[i].second;
-      }
-    }
-    return array_[size - 1].second;
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::UpperBound(const KeyType &key, const KeyComparator &comparator) -> int{
+    auto pair_comparator = [&](const KeyType &val, const MappingType &pair) -> bool {
+      return comparator(val, pair.first) < 0;
+    };
+    return std::upper_bound(array_ + 1, array_ + GetSize(), key, pair_comparator) - array_ - 1;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::ShiftElementsForward(const size_t pos1, const size_t pos2){
-    for (size_t i = pos1; i > pos2; i--) {
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value,
+                                                    const KeyComparator &comparator) -> void{
+    int be_inserted_idx = UpperBound(key, comparator) + 1;
+    for (int i = GetSize(); i > be_inserted_idx; i--) {
       array_[i] = array_[i - 1];
     }
+    array_[be_inserted_idx] = {key, value};
+    IncreaseSize(1);
 }
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertAtBack(const KeyType &key, const ValueType &value) -> void{
+    array_[GetSize()] = {key, value};
+    IncreaseSize(1);
+}
+
+//
+//INDEX_TEMPLATE_ARGUMENTS
+//auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::FindSmallestNumber(const KeyType &key, const KeyComparator &comparator) -> ValueType{
+//    auto size = GetSize();
+//    for(int i = 0; i < size; i++){
+//      /*comparator(a,b) = 0, if a = b
+//        comparator(a,b) > 0, if a > b
+//        comparator(a,b) < 0, if a < b
+//       */
+//      if(comparator(key, array_[i].first) == -1){
+//        return array_[i].second;
+//      }
+//    }
+//    return array_[size - 1].second;
+//}
+
 
 // valuetype for internalNode should be page id_t
 template class BPlusTreeInternalPage<GenericKey<4>, page_id_t, GenericComparator<4>>;

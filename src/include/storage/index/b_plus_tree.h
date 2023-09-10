@@ -90,17 +90,14 @@ class BPlusTree {
   int leaf_max_size_;
   int internal_max_size_;
   auto ReachLeafNode(const KeyType &key) -> LeafPage *;
-  void InsertInLeaf(LeafPage *leaf, const KeyType &key, const ValueType &value);
   template <typename NodeType>
   auto NewNode() -> NodeType *;
   template <typename NodeType>
   auto CopyToMemory(NodeType *node) -> NodeType *;
-  template <typename NodeType, typename ArrayType>
-  void InsertAfter(ArrayType m, NodeType *node);
   void InsertInParent(BPlusTreePage *n, const KeyType &k_new, BPlusTreePage *n_new);
   void NewRoot(const KeyType &key, const ValueType &value);
   template <typename NodeType>
-  int SplitNodes(NodeType &n, NodeType &n_new);
+  void SplitNodes(NodeType &n, NodeType &n_new);
 };
 
 }  // namespace bustub
