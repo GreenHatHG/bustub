@@ -5,6 +5,7 @@ CMD bash
 # Please add packages in alphabetical order.
 ARG DEBIAN_FRONTEND=noninteractive
 RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list &&\
+    sed -i 's/security.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list &&\
     apt-get -y update && \
     apt-get -y install \
       build-essential \
@@ -16,5 +17,6 @@ RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.l
       git \
       pkg-config \
       zlib1g-dev \
-      gdb
+      gdb \
+      zip
 

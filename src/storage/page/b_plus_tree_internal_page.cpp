@@ -26,74 +26,64 @@ namespace bustub {
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, int max_size) {
-    SetPageType(IndexPageType::INTERNAL_PAGE);
-    SetSize(0);
-    SetPageId(page_id);
-    SetParentPageId(parent_id);
-    SetMaxSize(max_size);
+  SetPageType(IndexPageType::INTERNAL_PAGE);
+  SetSize(0);
+  SetPageId(page_id);
+  SetParentPageId(parent_id);
+  SetMaxSize(max_size);
 }
 /*
  * Helper method to get/set the key associated with input "index"(a.k.a
  * array offset)
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const -> KeyType {
-    return array_[index].first;
-}
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const -> KeyType { return array_[index].first; }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) {
-    array_[index].first = key;
-}
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) { array_[index].first = key; }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::IndexAt(int index) const -> MappingType {
-    return array_[index];
-}
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::IndexAt(int index) const -> MappingType { return array_[index]; }
 
 /*
  * Helper method to get the value associated with input "index"(a.k.a array
  * offset)
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const -> ValueType {
-    return array_[index].second;
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const -> ValueType { return array_[index].second; }
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetIndex(const size_t idx, const MappingType &m) { array_[idx] = m; }
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::UpperBound(const KeyType &key, const KeyComparator &comparator) -> int {
+  auto pair_comparator = [&](const KeyType &val, const MappingType &pair) -> bool {
+    return comparator(val, pair.first) < 0;
+  };
+  return std::upper_bound(array_ + 1, array_ + GetSize(), key, pair_comparator) - array_ - 1;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetIndex(const size_t idx, const MappingType& m) {
-    array_[idx] = m;
-}
-
-
-INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::UpperBound(const KeyType &key, const KeyComparator &comparator) -> int{
-    auto pair_comparator = [&](const KeyType &val, const MappingType &pair) -> bool {
-      return comparator(val, pair.first) < 0;
-    };
-    return std::upper_bound(array_ + 1, array_ + GetSize(), key, pair_comparator) - array_ - 1;
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator)
+    -> void {
+  int be_inserted_idx = UpperBound(key, comparator) + 1;
+  for (int i = GetSize(); i > be_inserted_idx; i--) {
+    array_[i] = array_[i - 1];
+  }
+  array_[be_inserted_idx] = {key, value};
+  IncreaseSize(1);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value,
-                                                    const KeyComparator &comparator) -> void{
-    int be_inserted_idx = UpperBound(key, comparator) + 1;
-    for (int i = GetSize(); i > be_inserted_idx; i--) {
-      array_[i] = array_[i - 1];
-    }
-    array_[be_inserted_idx] = {key, value};
-    IncreaseSize(1);
-}
-
-INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertAtBack(const KeyType &key, const ValueType &value) -> void{
-    array_[GetSize()] = {key, value};
-    IncreaseSize(1);
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertAtBack(const KeyType &key, const ValueType &value) -> void {
+  array_[GetSize()] = {key, value};
+  IncreaseSize(1);
 }
 
 //
-//INDEX_TEMPLATE_ARGUMENTS
-//auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::FindSmallestNumber(const KeyType &key, const KeyComparator &comparator) -> ValueType{
+// INDEX_TEMPLATE_ARGUMENTS
+// auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::FindSmallestNumber(const KeyType &key, const KeyComparator &comparator) ->
+// ValueType{
 //    auto size = GetSize();
 //    for(int i = 0; i < size; i++){
 //      /*comparator(a,b) = 0, if a = b
@@ -106,7 +96,6 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertAtBack(const KeyType &key, const Valu
 //    }
 //    return array_[size - 1].second;
 //}
-
 
 // valuetype for internalNode should be page id_t
 template class BPlusTreeInternalPage<GenericKey<4>, page_id_t, GenericComparator<4>>;

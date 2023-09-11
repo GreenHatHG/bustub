@@ -11,7 +11,7 @@
 #pragma once
 
 #include <queue>
-
+#include <utility>
 #include "storage/page/b_plus_tree_page.h"
 
 namespace bustub {
@@ -42,7 +42,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   void SetKeyAt(int index, const KeyType &key);
   auto ValueAt(int index) const -> ValueType;
   void SetIndex(size_t idx, const std::pair<KeyType, ValueType> &m);
-  std::pair<KeyType, ValueType> IndexAt(int index) const;
+  auto IndexAt(int index) const -> std::pair<KeyType, ValueType>;
   auto UpperBound(const KeyType &key, const KeyComparator &comparator) -> int;
   void Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator);
   void InsertAtBack(const KeyType &key, const ValueType &value);
@@ -50,6 +50,6 @@ class BPlusTreeInternalPage : public BPlusTreePage {
  private:
   // Flexible array member for page data.
   // https://stackoverflow.com/questions/6390331/why-use-array-size-1-instead-of-pointer
-    MappingType array_[1];
+  MappingType array_[1];
 };
 }  // namespace bustub
