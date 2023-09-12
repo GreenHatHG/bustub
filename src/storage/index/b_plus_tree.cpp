@@ -39,10 +39,11 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
   for (int i = 0; i < leaf_node->GetSize(); i++) {
     if (comparator_(leaf_node->KeyAt(i), key) == 0) {
       result->push_back(leaf_node->ValueAt(i));
-      return true;
+      break;
     }
   }
-  return false;
+  buffer_pool_manager_->UnpinPage(leaf_node->GetPageId(), false);
+  return !result->empty();
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -56,6 +57,9 @@ auto BPLUSTREE_TYPE::ReachLeafNode(const KeyType &key) -> LeafPage * {
     auto next_page_id = internal_page->ValueAt(idx);
     buffer_pool_manager_->UnpinPage(current->GetPageId(), false);
 
+    if(next_page_id == 45){
+      std::cout << "";
+    }
     page = buffer_pool_manager_->FetchPage(next_page_id);
     current = reinterpret_cast<BPlusTreePage *>(page->GetData());
   }
