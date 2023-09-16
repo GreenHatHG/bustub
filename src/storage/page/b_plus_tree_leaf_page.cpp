@@ -102,6 +102,21 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::InsertAtBack(const KeyType &key, const ValueTyp
   IncreaseSize(1);
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveEntry(const KeyType &key, const KeyComparator &comparator) -> bool {
+  auto key_idx = UpperBound(key, comparator);
+  if(key_idx == GetSize()){
+    return false;
+  }
+
+  // ArrayIndexOutOfBoundsException ?
+  for(int i = key_idx; i < GetSize(); i++){
+    array_[key_idx] = array_[key_idx + 1];
+  }
+
+  IncreaseSize(-1);
+}
+
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;
 template class BPlusTreeLeafPage<GenericKey<8>, RID, GenericComparator<8>>;
 template class BPlusTreeLeafPage<GenericKey<16>, RID, GenericComparator<16>>;
