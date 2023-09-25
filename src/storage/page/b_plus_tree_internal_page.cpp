@@ -83,12 +83,15 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertAtBack(const KeyType &key, const Valu
 // 用于删除操作时。
 // 传入子节点的page_id，找到该子节点在父节点的位置，然后返回该位置的前一个位置，也就是子节点的左兄弟节点。
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::GetLeftSiblingPageIdx(const ValueType &child_page_id) -> int{
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::GetLeftSiblingPageIdx(const ValueType &child_page_id, bool* ok) -> int{
   for(int i = 0; i < GetSize(); i++){
     if(ValueAt(i) == child_page_id){
       if(i == 0){
-        return 0;
+        *ok = false;
+        return 1;
       }
+
+      *ok = true;
       return i - 1;
     }
   }

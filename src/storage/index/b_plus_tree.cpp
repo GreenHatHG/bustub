@@ -244,7 +244,8 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
   auto parent_id = leaf->GetParentPageId();
   auto *parent = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(parent_id)->GetData());
 
-  auto left_sibling_page_idx = parent->GetLeftSiblingPageIdx(leaf->GetPageId());
+  bool exist_sibling{true};
+  auto left_sibling_page_idx = parent->GetLeftSiblingPageIdx(leaf->GetPageId(), &exist_sibling);
   auto *leaf_sibling_page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(left_sibling_page_idx)->GetData());
 
   if(leaf_sibling_page->GetSize() + leaf->GetSize() <= leaf->GetMaxSize()){
@@ -257,6 +258,26 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
   buffer_pool_manager_->UnpinPage(parent_id, true);
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::CoalesceNodes(const bool exist_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page){
+  // 默认是合并到左边兄弟节点，现在没有左边兄弟节点，则需要合入到右边兄弟节点，所以这里需要交换一下变量
+  if(!exist_sibling){
+    std::swap(n, sibling_page);
+  }
+
+  if(!n->IsLeafPage()){
+
+  }else{
+    auto *leaf = reinterpret_cast<LeafPage *>(n);
+    auto *sibling_leaf = reinterpret_cast<LeafPage *>(sibling_page);
+    for(int i = sibling_leaf->GetSize(), j = 0; j < leaf->GetSize(); i++,j++){
+      sibling_leaf->InsertAtBack(leaf->KeyAt(j), leaf->ValueAt(j));
+    }
+    sibling_leaf->SetNextPageId(leaf->GetNextPageId());
+  }
+
+  //todo: unpin and delete page
+}
 /*****************************************************************************
  * INDEX ITERATOR
  *****************************************************************************/
