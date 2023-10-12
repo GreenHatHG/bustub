@@ -98,6 +98,7 @@ class BPlusTree {
   void NewRoot(const KeyType &key, const ValueType &value);
   template <typename NodeType>
   void SplitNodes(NodeType &n, NodeType &n_new);
+  void DeleteEntry(LeafPage *leaf, const KeyType &key);
 };
 
 }  // namespace bustub

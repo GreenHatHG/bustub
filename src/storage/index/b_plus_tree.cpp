@@ -223,6 +223,11 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
   }
 
   auto* leaf = ReachLeafNode(key);
+  DeleteEntry(leaf, key);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::DeleteEntry(LeafPage* leaf, const KeyType &key){
   auto ok = leaf->RemoveEntry(key, comparator_);
   if(!ok){
     return;
@@ -244,12 +249,14 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
   auto parent_id = leaf->GetParentPageId();
   auto *parent = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(parent_id)->GetData());
 
-  bool exist_sibling{true};
-  auto left_sibling_page_idx = parent->GetLeftSiblingPageIdx(leaf->GetPageId(), &exist_sibling);
+  bool exist_sibling;
+  KeyType parent_key{};
+  auto left_sibling_page_idx = parent->GetLeftSiblingPageIdx(leaf->GetPageId(), exist_sibling, parent_key);
   auto *leaf_sibling_page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(left_sibling_page_idx)->GetData());
 
   if(leaf_sibling_page->GetSize() + leaf->GetSize() <= leaf->GetMaxSize()){
     CoalesceNodes();
+    DeleteEntry(parent, parent_key);
   }else{
     RedistributeNodes();
   }
@@ -259,7 +266,7 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::CoalesceNodes(const bool exist_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page){
+void BPLUSTREE_TYPE::CoalesceNodes(const bool exist_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page, const KeyType &parent_key){
   // 默认是合并到左边兄弟节点，现在没有左边兄弟节点，则需要合入到右边兄弟节点，所以这里需要交换一下变量
   if(!exist_sibling){
     std::swap(n, sibling_page);
@@ -275,9 +282,10 @@ void BPLUSTREE_TYPE::CoalesceNodes(const bool exist_sibling, BPlusTreePage *n, B
     }
     sibling_leaf->SetNextPageId(leaf->GetNextPageId());
   }
-
-  //todo: unpin and delete page
+  buffer_pool_manager_->UnpinPage(sibling_page->GetPageId(), true);
+  buffer_pool_manager_->DeletePage(n->GetPageId());
 }
+
 /*****************************************************************************
  * INDEX ITERATOR
  *****************************************************************************/
