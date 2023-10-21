@@ -104,26 +104,28 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::InsertAtBack(const KeyType &key, const ValueTyp
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::InsertAtSecond(const KeyType &key, const ValueType &value) -> void {
-  for(int i = GetSize(); i >= 2; i--){
-    array_[i] = array_[i-1];
+  int i = GetSize();
+  for (; i >= 2; i--) {
+    array_[i] = array_[i - 1];
   }
-  array_[1] = {key, value};
+  array_[i] = {key, value};
   IncreaseSize(1);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveEntry(const KeyType &key, const KeyComparator &comparator) -> bool {
   auto key_idx = UpperBound(key, comparator);
-  if(key_idx == GetSize()){
+  if (key_idx == GetSize()) {
     return false;
   }
 
   // ArrayIndexOutOfBoundsException ?
-  for(int i = key_idx; i < GetSize(); i++){
+  for (int i = key_idx; i < GetSize(); i++) {
     array_[key_idx] = array_[key_idx + 1];
   }
 
   IncreaseSize(-1);
+  return true;
 }
 
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;

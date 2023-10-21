@@ -98,8 +98,7 @@ class BPlusTree {
   void NewRoot(const KeyType &key, const ValueType &value);
   template <typename NodeType>
   void SplitNodes(NodeType &n, NodeType &n_new);
-  void CoalesceNodes(bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page,
-                     const KeyType &parent_key);
+  void CoalesceNodes(bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page, const KeyType &parent_key);
   void DeleteEntry(BPlusTreePage *current, const KeyType &key);
   void RedistributeNodes(bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page,
                          InternalPage *parent_page, KeyType parent_key, int parent_idx);

@@ -218,33 +218,33 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
  */
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
-  if(IsEmpty()){
+  if (IsEmpty()) {
     return;
   }
 
-  auto* leaf = ReachLeafNode(key);
+  auto *leaf = ReachLeafNode(key);
   DeleteEntry(leaf, key);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::DeleteEntry(BPlusTreePage* current, const KeyType &key){
-  if(current->IsLeafPage()){
+void BPLUSTREE_TYPE::DeleteEntry(BPlusTreePage *current, const KeyType &key) {
+  if (current->IsLeafPage()) {
     auto current_leaf = reinterpret_cast<LeafPage *>(current);
-    if(!current_leaf->RemoveEntry(key, comparator_)){
+    if (!current_leaf->RemoveEntry(key, comparator_)) {
       return;
     }
-  }else{
+  } else {
     auto current_internal = reinterpret_cast<InternalPage *>(current);
-    if(!current_internal->RemoveEntry(key, comparator_)){
+    if (!current_internal->RemoveEntry(key, comparator_)) {
       return;
     }
   }
 
-  if(current->IsRootPage()){
-    if(current->IsLeafPage() && current->GetSize() == 0){
+  if (current->IsRootPage()) {
+    if (current->IsLeafPage() && current->GetSize() == 0) {
       root_page_id_ = INVALID_PAGE_ID;
     }
-    if(!current->IsLeafPage() && current->GetSize() == 1){
+    if (!current->IsLeafPage() && current->GetSize() == 1) {
       auto current_internal = reinterpret_cast<InternalPage *>(current);
       root_page_id_ = current_internal->ValueAt(0);
     }
@@ -252,7 +252,7 @@ void BPLUSTREE_TYPE::DeleteEntry(BPlusTreePage* current, const KeyType &key){
     return;
   }
 
-  if(current->GetSize() >= current->GetMinSize()){
+  if (current->GetSize() >= current->GetMinSize()) {
     return;
   }
 
@@ -262,14 +262,16 @@ void BPLUSTREE_TYPE::DeleteEntry(BPlusTreePage* current, const KeyType &key){
   bool exist_left_sibling;
   KeyType parent_key{};
   int parent_idx;
-  auto left_sibling_page_idx = parent->GetLeftSiblingPageIdx(current->GetPageId(), exist_left_sibling, parent_key, parent_idx);
-  auto *leaf_sibling_page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(left_sibling_page_idx)->GetData());
+  auto left_sibling_page_idx =
+      parent->GetLeftSiblingPageIdx(current->GetPageId(), exist_left_sibling, parent_key, parent_idx);
+  auto *leaf_sibling_page =
+      reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(left_sibling_page_idx)->GetData());
 
-  if(leaf_sibling_page->GetSize() + current->GetSize() <= current->GetMaxSize()){
+  if (leaf_sibling_page->GetSize() + current->GetSize() <= current->GetMaxSize()) {
     CoalesceNodes(exist_left_sibling, current, leaf_sibling_page, parent_key);
     DeleteEntry(parent, parent_key);
-  }else{
-    RedistributeNodes(exist_left_sibling, current, leaf_sibling_page,parent, parent_key, parent_idx);
+  } else {
+    RedistributeNodes(exist_left_sibling, current, leaf_sibling_page, parent, parent_key, parent_idx);
   }
 
   buffer_pool_manager_->UnpinPage(left_sibling_page_idx, true);
@@ -278,31 +280,32 @@ void BPLUSTREE_TYPE::DeleteEntry(BPlusTreePage* current, const KeyType &key){
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::CoalesceNodes(bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page, const KeyType &parent_key){
+void BPLUSTREE_TYPE::CoalesceNodes(bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page,
+                                   const KeyType &parent_key) {
   // 默认是合并到左边兄弟节点，现在没有左边兄弟节点，则需要合入到右边兄弟节点，所以这里需要交换一下变量
-  if(!exist_left_sibling){
+  if (!exist_left_sibling) {
     std::swap(n, sibling_page);
   }
 
-  if(!n->IsLeafPage()){
-    auto *sibling_internal = reinterpret_cast<InternalPage* >(sibling_page);
-    auto *n_internal = reinterpret_cast<InternalPage* >(n);
+  if (!n->IsLeafPage()) {
+    auto *sibling_internal = reinterpret_cast<InternalPage *>(sibling_page);
+    auto *n_internal = reinterpret_cast<InternalPage *>(n);
     int begin = sibling_internal->GetSize();
     sibling_internal->InsertAtBack(parent_key, n_internal->ValueAt(0));
-    for(int i = 1; i < n_internal->GetSize(); i++){
+    for (int i = 1; i < n_internal->GetSize(); i++) {
       sibling_internal->InsertAtBack(n_internal->KeyAt(i), n_internal->ValueAt(i));
     }
-    for(int i = begin; i < n_internal->GetSize(); i++){
+    for (int i = begin; i < n_internal->GetSize(); i++) {
       auto child_page_id = sibling_internal->ValueAt(i);
       auto child_page = buffer_pool_manager_->FetchPage(child_page_id);
-      auto child = reinterpret_cast<InternalPage* >(child_page->GetData());
+      auto child = reinterpret_cast<InternalPage *>(child_page->GetData());
       child->SetParentPageId(sibling_internal->GetPageId());
       buffer_pool_manager_->UnpinPage(child_page_id, true);
     }
-  }else{
+  } else {
     auto *leaf = reinterpret_cast<LeafPage *>(n);
     auto *sibling_leaf = reinterpret_cast<LeafPage *>(sibling_page);
-    for(int i = 0; i < leaf->GetSize(); i++){
+    for (int i = 0; i < leaf->GetSize(); i++) {
       sibling_leaf->InsertAtBack(leaf->KeyAt(i), leaf->ValueAt(i));
     }
     sibling_leaf->SetNextPageId(leaf->GetNextPageId());
@@ -313,19 +316,19 @@ void BPLUSTREE_TYPE::CoalesceNodes(bool exist_left_sibling, BPlusTreePage *n, BP
 
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::RedistributeNodes(bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page,
-                                       InternalPage* parent_page, KeyType parent_key, int parent_idx){
+                                       InternalPage *parent_page, KeyType parent_key, int parent_idx) {
   KeyType key{};
-  if(n->IsLeafPage()){
+  if (n->IsLeafPage()) {
     auto *n_leaf = reinterpret_cast<LeafPage *>(n);
     auto *sibling_leaf = reinterpret_cast<LeafPage *>(sibling_page);
     // 这里不能直接交换变量，比如 (1) (2 3 4)，交换变量后redistribute就变成了(1 4)(2 3)，不符合有序
-    if(exist_left_sibling){
+    if (exist_left_sibling) {
       auto last_key = sibling_leaf->KeyAt(sibling_leaf->GetSize());
       auto last_value = sibling_leaf->ValueAt(sibling_leaf->GetSize());
       n_leaf->InsertAtSecond(last_key, last_value);
       sibling_leaf->RemoveEntry(last_key, comparator_);
       key = last_key;
-    }else{
+    } else {
       auto first_key = sibling_leaf->KeyAt(1);
       auto first_value = sibling_leaf->ValueAt(1);
       n_leaf->InsertAtSecond(first_key, first_value);
@@ -333,21 +336,21 @@ void BPLUSTREE_TYPE::RedistributeNodes(bool exist_left_sibling, BPlusTreePage *n
       key = first_key;
     }
     parent_page->SetKeyAt(parent_idx, key);
-    //todo need?
-    buffer_pool_manager_->UnpinPage(n->GetPageId(),true);
-    buffer_pool_manager_->UnpinPage(sibling_page->GetPageId(),true);
-  }else{
-    auto n_internal = reinterpret_cast<InternalPage* >(n);
-    auto sibling_internal = reinterpret_cast<InternalPage* >(sibling_page);
+    // todo need?
+    buffer_pool_manager_->UnpinPage(n->GetPageId(), true);
+    buffer_pool_manager_->UnpinPage(sibling_page->GetPageId(), true);
+  } else {
+    auto n_internal = reinterpret_cast<InternalPage *>(n);
+    auto sibling_internal = reinterpret_cast<InternalPage *>(sibling_page);
     page_id_t child_page_id;
-    if(exist_left_sibling){
+    if (exist_left_sibling) {
       auto last_key = sibling_internal->KeyAt(sibling_page->GetSize());
       auto last_value = sibling_internal->ValueAt(sibling_internal->GetSize());
       n_internal->InsertAtSecond(parent_key, last_value);
       sibling_internal->RemoveEntry(last_key, comparator_);
       key = last_key;
       child_page_id = last_value;
-    }else{
+    } else {
       // todo note!!!!
       auto first_key = sibling_internal->KeyAt(1);
       auto first_value = sibling_internal->ValueAt(1);
@@ -363,7 +366,7 @@ void BPLUSTREE_TYPE::RedistributeNodes(bool exist_left_sibling, BPlusTreePage *n
     if (child_node->IsLeafPage()) {
       auto leaf_child_node = reinterpret_cast<LeafPage *>(child_page->GetData());
       leaf_child_node->SetParentPageId(n->GetPageId());
-    }else{
+    } else {
       auto internal_child_node = reinterpret_cast<InternalPage *>(child_page->GetData());
       internal_child_node->SetParentPageId(n->GetPageId());
     }
