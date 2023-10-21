@@ -103,6 +103,15 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::InsertAtBack(const KeyType &key, const ValueTyp
 }
 
 INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::InsertAtSecond(const KeyType &key, const ValueType &value) -> void {
+  for(int i = GetSize(); i >= 2; i--){
+    array_[i] = array_[i-1];
+  }
+  array_[1] = {key, value};
+  IncreaseSize(1);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveEntry(const KeyType &key, const KeyComparator &comparator) -> bool {
   auto key_idx = UpperBound(key, comparator);
   if(key_idx == GetSize()){

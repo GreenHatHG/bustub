@@ -46,7 +46,9 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   auto UpperBound(const KeyType &key, const KeyComparator &comparator) -> int;
   void Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator);
   void InsertAtBack(const KeyType &key, const ValueType &value);
-  int GetLeftSiblingPageIdx(const ValueType &child_page_id, bool& ok, KeyType& parentKey);
+  void InsertAtSecond(const KeyType &key, const ValueType &value);
+  int GetLeftSiblingPageIdx(const ValueType &child_page_id, bool &ok, KeyType &parentKey, int &parent_idx);
+  bool RemoveEntry(const KeyType &key, const KeyComparator &comparator);
 
  private:
   // Flexible array member for page data.

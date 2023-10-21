@@ -64,6 +64,21 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::UpperBound(const KeyType &key, const KeyCom
 }
 
 INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::RemoveEntry(const KeyType &key, const KeyComparator &comparator) -> bool {
+  auto key_idx = UpperBound(key, comparator);
+  if(key_idx == GetSize()){
+    return false;
+  }
+
+  // ArrayIndexOutOfBoundsException ?
+  for(int i = key_idx; i < GetSize(); i++){
+    array_[key_idx] = array_[key_idx + 1];
+  }
+
+  IncreaseSize(-1);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator)
     -> void {
   int be_inserted_idx = UpperBound(key, comparator) + 1;
@@ -80,20 +95,31 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertAtBack(const KeyType &key, const Valu
   IncreaseSize(1);
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertAtSecond(const KeyType &key, const ValueType &value) -> void {
+  for(int i = GetSize(); i >= 2; i--){
+    array_[i] = array_[i-1];
+  }
+  array_[1] = {key, value};
+  IncreaseSize(1);
+}
+
 // 用于删除操作时。
 // 传入子节点的page_id，找到该子节点在父节点的位置，然后返回该位置的前一个位置，也就是子节点的左兄弟节点。
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::GetLeftSiblingPageIdx(const ValueType &child_page_id, bool& ok, KeyType& parentKey) -> int{
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::GetLeftSiblingPageIdx(const ValueType &child_page_id, bool& ok, KeyType& parentKey, int& parent_idx) -> int{
   for(int i = 0; i < GetSize(); i++){
     if(ValueAt(i) == child_page_id){
       if(i == 0){
         ok = false;
         parentKey = KeyAt(1);
+        parent_idx = 1;
         return 1;
       }
 
       ok = true;
       parentKey = KeyAt(i);
+      parent_idx = i;
       return i - 1;
     }
   }

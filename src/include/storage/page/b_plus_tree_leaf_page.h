@@ -57,6 +57,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator);
   void InsertAtBack(const KeyType &key, const ValueType &value);
   auto RemoveEntry(const KeyType &key, const KeyComparator &comparator) -> bool;
+  void InsertAtSecond(const KeyType &key, const ValueType &value);
 
  private:
   page_id_t next_page_id_;
