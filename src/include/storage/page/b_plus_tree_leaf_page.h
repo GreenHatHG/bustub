@@ -53,7 +53,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto IndexAt(int index) const -> std::pair<KeyType, ValueType>;
   void SetIndex(size_t idx, const std::pair<KeyType, ValueType> &m);
   auto ExistsKey(const KeyType &key, const KeyComparator &comparator) -> bool;
-  auto UpperBound(const KeyType &key, const KeyComparator &comparator) -> int;
+  auto BinarySearchByKey(const KeyType &key, const KeyComparator &comparator) -> int;
   void Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator);
   void InsertAtBack(const KeyType &key, const ValueType &value);
   auto RemoveEntry(const KeyType &key, const KeyComparator &comparator) -> bool;

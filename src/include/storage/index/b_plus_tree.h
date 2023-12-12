@@ -89,7 +89,7 @@ class BPlusTree {
   KeyComparator comparator_;
   int leaf_max_size_;
   int internal_max_size_;
-  auto ReachLeafNode(const KeyType &key) -> LeafPage *;
+  auto FindLeafNode(const KeyType &key) -> LeafPage *;
   template <typename NodeType>
   auto NewNode() -> NodeType *;
   template <typename NodeType>

@@ -35,7 +35,7 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return root_page_id_ == INVALID_P
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction) -> bool {
-  auto leaf_node = ReachLeafNode(key);
+  auto leaf_node = FindLeafNode(key);
   for (int i = 0; i < leaf_node->GetSize(); i++) {
     if (comparator_(leaf_node->KeyAt(i), key) == 0) {
       result->push_back(leaf_node->ValueAt(i));
@@ -47,13 +47,13 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::ReachLeafNode(const KeyType &key) -> LeafPage * {
+auto BPLUSTREE_TYPE::FindLeafNode(const KeyType &key) -> LeafPage * {
   auto page = buffer_pool_manager_->FetchPage(root_page_id_);
   auto current = reinterpret_cast<BPlusTreePage *>(page->GetData());
 
   while (!current->IsLeafPage()) {
     auto *internal_page = reinterpret_cast<InternalPage *>(current);
-    int idx = internal_page->UpperBound(key, comparator_);
+    int idx = internal_page->BinarySearchByKey(key, comparator_);
     auto next_page_id = internal_page->ValueAt(idx);
     buffer_pool_manager_->UnpinPage(current->GetPageId(), false);
 
@@ -178,7 +178,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
     return true;
   }
 
-  auto leaf = ReachLeafNode(key);
+  auto leaf = FindLeafNode(key);
   if (leaf->ExistsKey(key, comparator_)) {
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
     return false;
@@ -193,10 +193,23 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
   }
 
   // 这里leaf node大小已经是max_size-1，但是还能插入一个，所以直接申请一个page没问题
-  auto leaf_new = CopyToMemory(leaf);
-  leaf_new->Insert(key, value, comparator_);
+  //  auto leaf_new = CopyToMemory(leaf);
+  //  leaf_new->Insert(key, value, comparator_);
+  auto leaf_new = NewNode<LeafPage>();
+  leaf->Insert(key, value, comparator_);
 
-  SplitNodes(leaf, leaf_new);
+  //  SplitNodes(leaf, leaf_new);
+  int mid = (leaf->GetSize() + 1) / 2;
+  int n_size = mid;
+  int n_new_size = leaf->GetSize() - mid;
+
+  leaf->SetSize(n_size);
+
+  leaf_new->SetSize(n_new_size);
+  for (int i = 0, j = n_size; i < n_new_size; i++, j++) {
+    leaf_new->SetIndex(i, leaf->IndexAt(j));
+  }
+
   leaf_new->SetNextPageId(leaf->GetNextPageId());
   leaf->SetNextPageId(leaf_new->GetPageId());
 
@@ -222,7 +235,7 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
     return;
   }
 
-  auto *leaf = ReachLeafNode(key);
+  auto *leaf = FindLeafNode(key);
   DeleteEntry(leaf, key);
 }
 

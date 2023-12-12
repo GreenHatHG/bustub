@@ -60,27 +60,15 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::IndexAt(int index) const -> MappingType { retur
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::ExistsKey(const KeyType &key, const KeyComparator &comparator) -> bool {
-  int left = 0;
-  int right = GetSize() - 1;
-  while (left <= right) {
-    int mid = left + (right - left) / 2;
-    if (comparator(array_[mid].first, key) == 0) {
-      return true;
-    }
-    if (comparator(array_[mid].first, key) < 0) {
-      left = mid + 1;
-    } else {
-      right = mid - 1;
-    }
-  }
-  return false;
+  auto idx = BinarySearchByKey(key, comparator);
+  return idx != GetSize() && comparator(KeyAt(idx), key) == 0;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::SetIndex(const size_t idx, const MappingType &m) { array_[idx] = m; }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::UpperBound(const KeyType &key, const KeyComparator &comparator) -> int {
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::BinarySearchByKey(const KeyType &key, const KeyComparator &comparator) -> int {
   auto cmp = [&](const MappingType &element, const KeyType &val) -> bool { return comparator(element.first, val) < 0; };
   return std::lower_bound(array_, array_ + GetSize(), key, cmp) - array_;
 }
@@ -88,7 +76,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::UpperBound(const KeyType &key, const KeyCompara
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator)
     -> void {
-  int be_inserted_idx = UpperBound(key, comparator);
+  int be_inserted_idx = BinarySearchByKey(key, comparator);
   for (int i = GetSize(); i > be_inserted_idx; i--) {
     array_[i] = array_[i - 1];
   }
@@ -114,7 +102,7 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::InsertAtSecond(const KeyType &key, const ValueT
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveEntry(const KeyType &key, const KeyComparator &comparator) -> bool {
-  auto key_idx = UpperBound(key, comparator);
+  auto key_idx = BinarySearchByKey(key, comparator);
   if (key_idx == GetSize()) {
     return false;
   }

@@ -7,3 +7,8 @@ docker run --rm --user $UID:$GID -v "$(pwd)":/home/bustub -w /home/bustub bustub
 ```shell
 docker run --rm --user $UID:$GID -v "$(pwd)":/home/bustub -w /home/bustub bustub bash -c "cd build && make format && make check-lint && make check-clang-tidy-p2"
 ```
+
+# 3. make submit-2
+```shell
+docker run --rm --user $UID:$GID -v "$(pwd)":/home/bustub -w /home/bustub bustub bash -c "cd build && make submit-p2"
+```

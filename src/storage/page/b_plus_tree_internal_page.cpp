@@ -56,7 +56,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetIndex(const size_t idx, const MappingType &m) { array_[idx] = m; }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::UpperBound(const KeyType &key, const KeyComparator &comparator) -> int {
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::BinarySearchByKey(const KeyType &key, const KeyComparator &comparator) -> int {
   auto pair_comparator = [&](const KeyType &val, const MappingType &pair) -> bool {
     return comparator(val, pair.first) < 0;
   };
@@ -65,7 +65,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::UpperBound(const KeyType &key, const KeyCom
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::RemoveEntry(const KeyType &key, const KeyComparator &comparator) -> bool {
-  auto key_idx = UpperBound(key, comparator);
+  auto key_idx = BinarySearchByKey(key, comparator);
   if (key_idx == GetSize()) {
     return false;
   }
@@ -82,7 +82,7 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::RemoveEntry(const KeyType &key, const KeyCo
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator)
     -> void {
-  int be_inserted_idx = UpperBound(key, comparator) + 1;
+  int be_inserted_idx = BinarySearchByKey(key, comparator) + 1;
   for (int i = GetSize(); i > be_inserted_idx; i--) {
     array_[i] = array_[i - 1];
   }
