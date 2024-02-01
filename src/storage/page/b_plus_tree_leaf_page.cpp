@@ -56,7 +56,7 @@ INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::ValueAt(int index) const -> ValueType { return array_[index].second; }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::IndexAt(int index) const -> MappingType { return array_[index]; }
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::IndexAt(int index) const -> const MappingType & { return array_[index]; }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::ExistsKey(const KeyType &key, const KeyComparator &comparator) -> bool {
@@ -107,9 +107,8 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveEntry(const KeyType &key, const KeyCompar
     return false;
   }
 
-  // ArrayIndexOutOfBoundsException ?
-  for (int i = key_idx; i < GetSize(); i++) {
-    array_[key_idx] = array_[key_idx + 1];
+  for (int i = key_idx; i < GetSize() - 1; i++) {
+    array_[i] = array_[i + 1];
   }
 
   IncreaseSize(-1);

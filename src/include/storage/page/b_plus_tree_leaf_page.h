@@ -50,7 +50,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
   auto ValueAt(int index) const -> ValueType;
-  auto IndexAt(int index) const -> std::pair<KeyType, ValueType>;
+  auto IndexAt(int index) const -> const MappingType &;
   void SetIndex(size_t idx, const std::pair<KeyType, ValueType> &m);
   auto ExistsKey(const KeyType &key, const KeyComparator &comparator) -> bool;
   auto BinarySearchByKey(const KeyType &key, const KeyComparator &comparator) -> int;

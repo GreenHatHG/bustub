@@ -23,6 +23,12 @@ namespace bustub {
 
 #define BPLUSTREE_TYPE BPlusTree<KeyType, ValueType, KeyComparator>
 
+enum class Operation {
+  Insert,
+  Search,
+  Delete
+};
+
 /**
  * Main class providing the API for the Interactive B+ Tree.
  *
@@ -89,7 +95,10 @@ class BPlusTree {
   KeyComparator comparator_;
   int leaf_max_size_;
   int internal_max_size_;
-  auto FindLeafNode(const KeyType &key) -> LeafPage *;
+
+  std::mutex root_latch_;
+
+  auto FindLeafNode(const KeyType &key = KeyType{}, bool left_most = true) -> LeafPage *;
   template <typename NodeType>
   auto NewNode() -> NodeType *;
   template <typename NodeType>

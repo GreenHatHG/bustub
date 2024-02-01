@@ -48,7 +48,7 @@ BufferPoolManagerInstance::~BufferPoolManagerInstance() {
 auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
   std::scoped_lock<std::mutex> lock(latch_);
 
-  std::cout << "[BPM:NewPg]" << std::endl;
+  // std::cout << "[BPM:NewPg]" << std::endl;
   frame_id_t frame_id;
   auto *page = GetVictimPage(&frame_id, INVALID_PAGE_ID);
   if (page == nullptr) {
@@ -67,7 +67,7 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
     pages_[frame_id].pin_count_++;
     replacer_->RecordAccess(frame_id);
     replacer_->SetEvictable(frame_id, false);
-    std::cout << "[BPM:FetchPg] page_id: " << page_id << " in buffer pool" << std::endl;
+    // std::cout << "[BPM:FetchPg] page_id: " << page_id << " in buffer pool" << std::endl;
     return &pages_[frame_id];
   }
 
@@ -76,7 +76,7 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
     return nullptr;
   }
 
-  std::cout << "[BPM:FetchPg] page_id: " << page_id << " fetch from disk" << std::endl;
+  // std::cout << "[BPM:FetchPg] page_id: " << page_id << " fetch from disk" << std::endl;
   char page_data[BUSTUB_PAGE_SIZE];
   disk_manager_->ReadPage(page_id, page_data);
   memcpy(page->data_, page_data, BUSTUB_PAGE_SIZE);
@@ -89,7 +89,7 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
 
   frame_id_t frame_id;
   if (!page_table_->Find(page_id, frame_id)) {
-    std::cout << "[BPM:UnpinPg] page_id: " << page_id << "not in page_table" << std::endl;
+    // std::cout << "[BPM:UnpinPg] page_id: " << page_id << "not in page_table" << std::endl;
     return false;
   }
 
@@ -107,8 +107,8 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
     page->is_dirty_ = true;
   }
 
-  std::cout << "[BPM:UnpinPg] page_id: " << page_id << " unpin success, new pin count: " << page->pin_count_
-            << std::endl;
+  // std::cout << "[BPM:UnpinPg] page_id: " << page_id << " unpin success, new pin count: " << page->pin_count_
+  //            << std::endl;
   return true;
 }
 
@@ -117,14 +117,14 @@ auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
 
   frame_id_t frame_id;
   if (!page_table_->Find(page_id, frame_id)) {
-    std::cout << "[BPM:FlushPg] page_id: %d" << page_id << " not in page_table" << std::endl;
+    // std::cout << "[BPM:FlushPg] page_id: %d" << page_id << " not in page_table" << std::endl;
     return false;
   }
 
   Page *page = &pages_[frame_id];
   disk_manager_->WritePage(page_id, page->GetData());
   page->is_dirty_ = false;
-  std::cout << "[BPM:FlushPg] page_id: " << page_id << " flush success" << std::endl;
+  // std::cout << "[BPM:FlushPg] page_id: " << page_id << " flush success" << '\n';
   return true;
 }
 

@@ -141,8 +141,8 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   auto DeletePgImp(page_id_t page_id) -> bool override;
 
   auto GetVictimPage(frame_id_t *frame_id, page_id_t page_id) -> Page * {
-    std::cout << "[BPM:NewPageFromFreeListOrReplacer] free_list size:" << free_list_.size()
-              << ", replacer size:" << replacer_->Size() << std::endl;
+    //    std::cout << "[BPM:NewPageFromFreeListOrReplacer] free_list size:" << free_list_.size()
+    //              << ", replacer size:" << replacer_->Size() << std::endl;
 
     if (free_list_.empty() && replacer_->Size() == 0) {
       return nullptr;
@@ -156,7 +156,8 @@ class BufferPoolManagerInstance : public BufferPoolManager {
     }
 
     Page *page = &pages_[*frame_id];
-    std::cout << "[BPM:NewPageFromFreeListOrReplacer] page table remove page id: " << page->GetPageId() << std::endl;
+    //    std::cout << "[BPM:NewPageFromFreeListOrReplacer] page table remove page id: " << page->GetPageId() <<
+    //    std::endl;
     page_table_->Remove(page->GetPageId());
 
     if (page->IsDirty()) {
@@ -169,7 +170,7 @@ class BufferPoolManagerInstance : public BufferPoolManager {
 
     if (page_id == INVALID_PAGE_ID) {
       page_id = AllocatePage();
-      std::cout << "[BPM:NewPageFromFreeListOrReplacer] allocate page id: " << page_id << std::endl;
+      //      std::cout << "[BPM:NewPageFromFreeListOrReplacer] allocate page id: " << page_id << std::endl;
     }
     page->page_id_ = page_id;
 
