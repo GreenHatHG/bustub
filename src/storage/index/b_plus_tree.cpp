@@ -35,7 +35,7 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return root_page_id_ == INVALID_P
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction) -> bool {
-  auto leaf_node = FindLeafNode(key);
+  auto [_, leaf_node] = FindLeafNode(key, Operation::Search, transaction);
   for (int i = 0; i < leaf_node->GetSize(); i++) {
     if (comparator_(leaf_node->KeyAt(i), key) == 0) {
       result->push_back(leaf_node->ValueAt(i));
@@ -47,10 +47,12 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::UnlockAndUnpin(Transaction *txn) -> bool{
+auto BPLUSTREE_TYPE::UnlockAndUnpin(Transaction *txn, bool is_unpin) -> void{
   for(auto page: *txn->GetPageSet()){
     page->WUnlatch();
-    buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
+    if(is_unpin){
+      buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
+    }
   }
   txn->GetPageSet()->clear();
 }
@@ -64,25 +66,31 @@ auto BPLUSTREE_TYPE::IsSafe(BPlusTreePage* page, Operation& op) -> bool{
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::FindLeafNode(const KeyType &key, Operation& op, Transaction *txn, bool left_most) -> LeafPage * {
+auto BPLUSTREE_TYPE::FindLeafNode(const KeyType &key, Operation op, Transaction *txn, bool left_most) -> std::pair<Page*, LeafPage*> {
   root_latch_.lock();
-  bool is_root_latch = true;
+//  bool is_root_latch = true;
 
   auto page = buffer_pool_manager_->FetchPage(root_page_id_);
   assert(page->GetPageId() == root_page_id_);
+
+  auto current = reinterpret_cast<BPlusTreePage *>(page->GetData());
+  // 只有一个root节点，不用锁page，因为有root_latch
+//  if(current->GetSize() == 0){
+//    return std::make_pair(page, reinterpret_cast<LeafPage *>(current));
+//  }
 
   if(op == Operation::Search){
     page->RLatch();
   }else{
     page->WLatch();
   }
+  root_latch_.unlock();
 
-  auto current = reinterpret_cast<BPlusTreePage *>(page->GetData());
   while (!current->IsLeafPage()) {
     auto *internal_page = reinterpret_cast<InternalPage *>(current);
 
     int idx = 0;
-    if (comparator_(key, KeyType{}) != 0) {
+    if (comparator_(key, {}) != 0) {
       idx = internal_page->BinarySearchByKey(key, comparator_);
     } else if (!left_most) {
       idx = internal_page->GetSize() - 1;
@@ -90,32 +98,32 @@ auto BPLUSTREE_TYPE::FindLeafNode(const KeyType &key, Operation& op, Transaction
 
     auto child_page_id = internal_page->ValueAt(idx);
     auto child_page = buffer_pool_manager_->FetchPage(child_page_id);
-    auto child_internal_page = reinterpret_cast<BPlusTreePage *>(child_page->GetData());
+    auto child_tree_page = reinterpret_cast<BPlusTreePage *>(child_page->GetData());
 
     if(op == Operation::Search){
       child_page->RLatch();
       page->RUnlatch();
       buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
-      if(is_root_latch) {
-        root_latch_.unlock();
-        is_root_latch = false;
-      }
-    } else{
+//      if(is_root_latch) {
+//        root_latch_.unlock();
+//        is_root_latch = false;
+//      }
+    } else if(txn != nullptr){
       child_page->WLatch();
       txn->AddIntoPageSet(page);
-      if(IsSafe(child_page, op)){
-        if(is_root_latch){
-          root_latch_.unlock();
-          is_root_latch = false;
-        }
-        UnlockAndUnpin(txn);
+      if(IsSafe(child_tree_page, op)){
+//        if(is_root_latch){
+//          root_latch_.unlock();
+//          is_root_latch = false;
+//        }
+        UnlockAndUnpin(txn, true);
       }
     }
 
     page = child_page;
-    current = child_internal_page;
+    current = child_tree_page;
   }
-  return reinterpret_cast<LeafPage *>(current);
+  return std::make_pair(page, reinterpret_cast<LeafPage *>(current));
 }
 
 /*****************************************************************************
@@ -190,11 +198,14 @@ auto BPLUSTREE_TYPE::InsertInParent(BPlusTreePage *n, const KeyType &k_new, BPlu
     n_new->SetParentPageId(root_new->GetPageId());
 
     buffer_pool_manager_->UnpinPage(root_new->GetPageId(), true);
+
+//    root_latch_.unlock();
     return;
   }
 
   auto parent_id = n->GetParentPageId();
-  auto *parent = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(parent_id)->GetData());
+  auto parent_page = buffer_pool_manager_->FetchPage(parent_id);
+  auto *parent = reinterpret_cast<InternalPage *>(parent_page->GetData());
   // 对于internal node，插入之前的size等于max_size需要拆分
   // 所以这里插入前不拆分的极端情况是max_size-1
   if (parent->GetSize() < parent->GetMaxSize()) {
@@ -217,6 +228,7 @@ auto BPLUSTREE_TYPE::InsertInParent(BPlusTreePage *n, const KeyType &k_new, BPlu
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::NewRoot(const KeyType &key, const ValueType &value) -> void {
+  std::scoped_lock<std::mutex> lock(root_latch_);
   auto *r = NewNode<LeafPage>();
   r->InsertAtBack(key, value);
   root_page_id_ = r->GetPageId();
@@ -226,17 +238,17 @@ auto BPLUSTREE_TYPE::NewRoot(const KeyType &key, const ValueType &value) -> void
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) -> bool {
-  std::scoped_lock<std::mutex> lock(latch_);
-
   std::cout << "[BPLUSTREE_TYPE::Insert] - key: " << key << ", value: " << value << std::endl;
   if (IsEmpty()) {
     NewRoot(key, value);
     return true;
   }
 
-  auto leaf = FindLeafNode(key);
+  auto [leaf_page, leaf] = FindLeafNode(key, Operation::Insert, transaction);
   if (leaf->ExistsKey(key, comparator_)) {
+    UnlockAndUnpin(transaction, true);
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
+    leaf_page->WUnlatch();
     return false;
   }
 
@@ -245,16 +257,18 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
   if (leaf->GetSize() < leaf->GetMaxSize() - 1) {
     leaf->Insert(key, value, comparator_);
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
+    UnlockAndUnpin(transaction, true);
+    leaf_page->WUnlatch();
     return true;
   }
 
   // 这里leaf node大小已经是max_size-1，但是还能插入一个，所以直接申请一个page没问题
-  //  auto leaf_new = CopyToMemory(leaf);
-  //  leaf_new->Insert(key, value, comparator_);
+//    auto leaf_new = CopyToMemory(leaf);
+//    leaf_new->Insert(key, value, comparator_);
   auto leaf_new = NewNode<LeafPage>();
   leaf->Insert(key, value, comparator_);
 
-  //  SplitNodes(leaf, leaf_new);
+//    SplitNodes(leaf, leaf_new);
   int mid = (leaf->GetSize() + 1) / 2;
   int n_size = mid;
   int n_new_size = leaf->GetSize() - mid;
@@ -272,6 +286,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
   InsertInParent(leaf, leaf_new->KeyAt(0), leaf_new);
   buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
   buffer_pool_manager_->UnpinPage(leaf_new->GetPageId(), true);
+  UnlockAndUnpin(transaction, false);
   return true;
 }
 
@@ -287,15 +302,13 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
  */
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
-  std::scoped_lock<std::mutex> lock(latch_);
-
   std::cout << "[BPLUSTREE_TYPE::Remove] - key: " << key << std::endl;
 
   if (IsEmpty()) {
     return;
   }
 
-  auto *leaf = FindLeafNode(key);
+  auto [leaf_page, leaf] = FindLeafNode(key, Operation::Delete, transaction);
   DeleteEntry(leaf, key);
 }
 
@@ -456,7 +469,7 @@ void BPLUSTREE_TYPE::RedistributeNodes(bool exist_left_sibling, BPlusTreePage *n
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
-  auto left_most_leaf_node = FindLeafNode();
+  auto [_, left_most_leaf_node] = FindLeafNode({}, Operation::Search, nullptr);
   return INDEXITERATOR_TYPE(left_most_leaf_node, buffer_pool_manager_);
 }
 
@@ -467,7 +480,7 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
-  auto leaf_node = FindLeafNode(key);
+  auto [_, leaf_node] = FindLeafNode(key, Operation::Search, nullptr);
   auto idx = leaf_node->BinarySearchByKey(key, comparator_);
   return INDEXITERATOR_TYPE(leaf_node, buffer_pool_manager_, idx);
 }
@@ -479,7 +492,7 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
-  auto right_most_leaf_node = FindLeafNode({}, false);
+  auto [_, right_most_leaf_node] = FindLeafNode({}, Operation::Search, nullptr, false);
   return INDEXITERATOR_TYPE(right_most_leaf_node, buffer_pool_manager_, right_most_leaf_node->GetSize());
 }
 

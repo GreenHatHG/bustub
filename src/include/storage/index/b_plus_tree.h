@@ -98,7 +98,7 @@ class BPlusTree {
 
   std::mutex root_latch_;
 
-  auto FindLeafNode(const KeyType &key = KeyType{}, bool left_most = true) -> LeafPage *;
+  auto FindLeafNode(const KeyType &key, Operation op, Transaction *txn, bool left_most=true) -> std::pair<Page*, LeafPage*>;
   template <typename NodeType>
   auto NewNode() -> NodeType *;
   template <typename NodeType>
@@ -111,6 +111,8 @@ class BPlusTree {
   void DeleteEntry(BPlusTreePage *current, const KeyType &key);
   void RedistributeNodes(bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page,
                          InternalPage *parent_page, KeyType parent_key, int parent_idx);
+  void UnlockAndUnpin(Transaction *txn, bool is_unpin);
+  bool IsSafe(BPlusTreePage *page, Operation &op);
 };
 
 }  // namespace bustub
