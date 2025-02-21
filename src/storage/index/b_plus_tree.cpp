@@ -9,7 +9,7 @@
 namespace bustub {
 INDEX_TEMPLATE_ARGUMENTS
 BPLUSTREE_TYPE::BPlusTree(std::string name, BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator,
-                          int leaf_max_size, int internal_max_size)
+                          const int leaf_max_size, const int internal_max_size)
     : index_name_(std::move(name)),
       root_page_id_(INVALID_PAGE_ID),
       buffer_pool_manager_(buffer_pool_manager),
@@ -47,12 +47,15 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::UnlockAndUnpin(Transaction *txn, bool is_unpin) -> void{
-  for(auto page: *txn->GetPageSet()){
-    page->WUnlatch();
-    if(is_unpin){
-      buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
-    }
+auto BPLUSTREE_TYPE::UnlockAndUnpinPage(Page *page, const bool is_dirty) const -> void {
+  page->WUnlatch();
+  buffer_pool_manager_->UnpinPage(page->GetPageId(), is_dirty);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::UnlockAndUnpinTxn(Transaction *txn) const -> void{
+  for (const auto page: *txn->GetPageSet()){
+    UnlockAndUnpinPage(page, false);
   }
   txn->GetPageSet()->clear();
 }
@@ -66,7 +69,7 @@ auto BPLUSTREE_TYPE::IsSafe(BPlusTreePage* page, Operation& op) -> bool{
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::FindLeafNode(const KeyType &key, Operation op, Transaction *txn, bool left_most) -> std::pair<Page*, LeafPage*> {
+auto BPLUSTREE_TYPE::FindLeafNode(const KeyType &key, Operation op, Transaction *txn, const bool left_most) -> std::pair<Page*, LeafPage*> {
   root_latch_.lock();
 //  bool is_root_latch = true;
 
@@ -83,6 +86,9 @@ auto BPLUSTREE_TYPE::FindLeafNode(const KeyType &key, Operation op, Transaction 
     page->RLatch();
   }else{
     page->WLatch();
+    if (txn != nullptr) {
+      txn->AddIntoPageSet(page);
+    }
   }
   root_latch_.unlock();
 
@@ -110,13 +116,13 @@ auto BPLUSTREE_TYPE::FindLeafNode(const KeyType &key, Operation op, Transaction 
 //      }
     } else if(txn != nullptr){
       child_page->WLatch();
-      txn->AddIntoPageSet(page);
+      txn->AddIntoPageSet(child_page);
       if(IsSafe(child_tree_page, op)){
 //        if(is_root_latch){
 //          root_latch_.unlock();
 //          is_root_latch = false;
 //        }
-        UnlockAndUnpin(txn, true);
+        UnlockAndUnpinTxn(txn);
       }
     }
 
@@ -238,7 +244,7 @@ auto BPLUSTREE_TYPE::NewRoot(const KeyType &key, const ValueType &value) -> void
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) -> bool {
-  std::cout << "[BPLUSTREE_TYPE::Insert] - key: " << key << ", value: " << value << std::endl;
+  std::cout << "[BPLUSTREE_TYPE::Insert] - key: [" << key << "], value: [" << value << "]" << std::endl;
   if (IsEmpty()) {
     NewRoot(key, value);
     return true;
@@ -246,9 +252,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
 
   auto [leaf_page, leaf] = FindLeafNode(key, Operation::Insert, transaction);
   if (leaf->ExistsKey(key, comparator_)) {
-    UnlockAndUnpin(transaction, true);
-    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
-    leaf_page->WUnlatch();
+    UnlockAndUnpinTxn(transaction);
     return false;
   }
 
@@ -256,26 +260,27 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
   // 极端情况下等于max_size-1，插入后就需要拆分了
   if (leaf->GetSize() < leaf->GetMaxSize() - 1) {
     leaf->Insert(key, value, comparator_);
-    buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
-    UnlockAndUnpin(transaction, true);
-    leaf_page->WUnlatch();
+    UnlockAndUnpinPage(leaf, true);
+    transaction->GetPageSet()->pop_back();
+    UnlockAndUnpinTxn(transaction);
     return true;
   }
 
   // 这里leaf node大小已经是max_size-1，但是还能插入一个，所以直接申请一个page没问题
-//    auto leaf_new = CopyToMemory(leaf);
-//    leaf_new->Insert(key, value, comparator_);
+  //  auto leaf_new = CopyToMemory(leaf);
+  //  leaf_new->Insert(key, value, comparator_);
+
   auto leaf_new = NewNode<LeafPage>();
   leaf->Insert(key, value, comparator_);
 
-//    SplitNodes(leaf, leaf_new);
+  //  SplitNodes(leaf, leaf_new);
   int mid = (leaf->GetSize() + 1) / 2;
   int n_size = mid;
   int n_new_size = leaf->GetSize() - mid;
 
   leaf->SetSize(n_size);
-
   leaf_new->SetSize(n_new_size);
+
   for (int i = 0, j = n_size; i < n_new_size; i++, j++) {
     leaf_new->SetIndex(i, leaf->IndexAt(j));
   }
@@ -286,7 +291,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
   InsertInParent(leaf, leaf_new->KeyAt(0), leaf_new);
   buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
   buffer_pool_manager_->UnpinPage(leaf_new->GetPageId(), true);
-  UnlockAndUnpin(transaction, false);
+  UnlockAndUnpinTxn(transaction);
   return true;
 }
 
@@ -366,7 +371,7 @@ void BPLUSTREE_TYPE::DeleteEntry(BPlusTreePage *current, const KeyType &key) {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::CoalesceNodes(bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page,
+void BPLUSTREE_TYPE::CoalesceNodes(const bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page,
                                    const KeyType &parent_key) {
   // 默认是合并到左边兄弟节点，现在没有左边兄弟节点，则需要合入到右边兄弟节点，所以这里需要交换一下变量
   if (!exist_left_sibling) {
@@ -401,7 +406,7 @@ void BPLUSTREE_TYPE::CoalesceNodes(bool exist_left_sibling, BPlusTreePage *n, BP
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::RedistributeNodes(bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page,
+void BPLUSTREE_TYPE::RedistributeNodes(const bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page,
                                        InternalPage *parent_page, KeyType parent_key, int parent_idx) {
   KeyType key{};
   if (n->IsLeafPage()) {
@@ -514,7 +519,7 @@ auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t { return root_page_id_; }
  * updating it.
  */
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::UpdateRootPageId(int insert_record) {
+void BPLUSTREE_TYPE::UpdateRootPageId(const int insert_record) {
   auto *header_page = static_cast<HeaderPage *>(buffer_pool_manager_->FetchPage(HEADER_PAGE_ID));
   if (insert_record != 0) {
     // create a new record<index_name + root_page_id> in header_page

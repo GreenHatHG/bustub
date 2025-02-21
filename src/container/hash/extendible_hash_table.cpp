@@ -38,7 +38,7 @@ template <typename K, typename V>
 ExtendibleHashTable<K, V>::ExtendibleHashTable(size_t bucket_size)
     : global_depth_(0), bucket_size_(bucket_size), num_buckets_(1) {
   //  dir_.assign(2, std::make_shared<Bucket>(Bucket(bucket_size, 1)));
-  std::cout << "[Init] bucket_size:" << bucket_size << std::endl;
+  std::cout << "[ExtendibleHashTable::Init] bucket_size:" << bucket_size << std::endl;
   dir_ = {std::make_shared<Bucket>(bucket_size, 0)};
 }
 

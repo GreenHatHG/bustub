@@ -111,7 +111,8 @@ class BPlusTree {
   void DeleteEntry(BPlusTreePage *current, const KeyType &key);
   void RedistributeNodes(bool exist_left_sibling, BPlusTreePage *n, BPlusTreePage *sibling_page,
                          InternalPage *parent_page, KeyType parent_key, int parent_idx);
-  void UnlockAndUnpin(Transaction *txn, bool is_unpin);
+  void UnlockAndUnpinTxn(Transaction *txn) const;
+  auto UnlockAndUnpinPage(Page *page, bool is_dirty) const -> void;
   bool IsSafe(BPlusTreePage *page, Operation &op);
 };
 
